@@ -1,0 +1,7 @@
+project_id = "smpoflvsafvmuxmfbmra"
+
+[functions.purchase-pack]
+verify_jwt = false
+
+[functions.approve-recharge]
+verify_jwt = false

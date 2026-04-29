@@ -1,0 +1,535 @@
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Labour Day — Red / Black / White industrial theme */
+    --background: 0 0% 96%;
+    --foreground: 0 0% 8%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 8%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 8%;
+
+    --primary: 0 72% 42%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 92%;
+    --secondary-foreground: 0 0% 12%;
+
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 38%;
+
+    --accent: 0 0% 12%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 84% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 88%;
+    --input: 0 0% 88%;
+    --ring: 0 72% 42%;
+
+    --radius: 0.5rem;
+
+    /* Theme tokens (kept under `valentine-*` names for component compatibility) */
+    --valentine-blush: 0 0% 12%;             /* black-ish */
+    --valentine-blush-light: 0 0% 22%;
+    --valentine-blush-dark: 0 0% 6%;
+    --valentine-rose: 0 72% 42%;             /* labour red */
+    --valentine-rose-light: 0 72% 55%;
+    --valentine-rose-dark: 0 78% 32%;
+    --valentine-cream: 0 0% 100%;
+    --valentine-warm: 0 0% 96%;              /* light grey */
+    --valentine-warm-dark: 0 0% 25%;         /* dark grey */
+    --valentine-deep: 0 0% 8%;
+
+    /* Legacy palette aliases */
+    --newyear-purple: 0 72% 42%;
+    --newyear-purple-light: 0 72% 55%;
+    --newyear-purple-dark: 0 78% 32%;
+    --newyear-blue: 0 0% 25%;
+    --newyear-blue-light: 0 0% 40%;
+    --newyear-blue-dark: 0 0% 12%;
+    --newyear-gold: 0 72% 42%;
+    --newyear-gold-light: 0 72% 55%;
+    --newyear-gold-dark: 0 78% 32%;
+    --newyear-silver: 0 0% 92%;
+    --newyear-midnight: 0 0% 8%;
+
+    /* Flat "gradients" — solid fills for industrial look */
+    --gradient-valentine: linear-gradient(180deg, hsl(0 72% 42%) 0%, hsl(0 78% 36%) 100%);
+    --gradient-blush: linear-gradient(180deg, hsl(0 0% 96%) 0%, hsl(0 0% 100%) 100%);
+    --gradient-romantic: linear-gradient(180deg, hsl(0 0% 98%) 0%, hsl(0 0% 100%) 100%);
+    --gradient-warm: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(0 0% 94%) 100%);
+    --gradient-festive: linear-gradient(180deg, hsl(0 0% 10%) 0%, hsl(0 0% 6%) 100%);
+
+    /* Shadows — strong, flat */
+    --shadow-valentine: 0 6px 18px -6px hsl(0 72% 30% / 0.35);
+    --shadow-rose: 0 4px 14px -4px hsl(0 0% 0% / 0.25);
+    --shadow-card: 0 2px 10px -2px hsl(0 0% 0% / 0.12);
+    --shadow-glow: 0 0 0 2px hsl(0 72% 42% / 0.25);
+
+    /* Sidebar */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 0 0% 10%;
+    --sidebar-primary: 0 72% 42%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 0% 88%;
+    --sidebar-ring: 0 72% 42%;
+  }
+
+  .dark {
+    --background: 0 0% 7%;
+    --foreground: 0 0% 96%;
+
+    --card: 0 0% 11%;
+    --card-foreground: 0 0% 96%;
+
+    --popover: 0 0% 11%;
+    --popover-foreground: 0 0% 96%;
+
+    --primary: 0 72% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 16%;
+    --secondary-foreground: 0 0% 92%;
+
+    --muted: 0 0% 16%;
+    --muted-foreground: 0 0% 65%;
+
+    --accent: 0 0% 92%;
+    --accent-foreground: 0 0% 8%;
+
+    --destructive: 0 80% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 0 72% 50%;
+
+    --valentine-blush: 0 0% 18%;
+    --valentine-blush-light: 0 0% 28%;
+    --valentine-blush-dark: 0 0% 8%;
+    --valentine-rose: 0 72% 50%;
+    --valentine-rose-light: 0 72% 60%;
+    --valentine-rose-dark: 0 78% 38%;
+    --valentine-cream: 0 0% 13%;
+    --valentine-warm: 0 0% 18%;
+    --valentine-warm-dark: 0 0% 30%;
+    --valentine-deep: 0 0% 5%;
+
+    --newyear-purple: 0 72% 50%;
+    --newyear-purple-light: 0 72% 60%;
+    --newyear-purple-dark: 0 78% 38%;
+    --newyear-blue: 0 0% 30%;
+    --newyear-blue-light: 0 0% 45%;
+    --newyear-blue-dark: 0 0% 18%;
+    --newyear-gold: 0 72% 50%;
+    --newyear-gold-light: 0 72% 60%;
+    --newyear-gold-dark: 0 78% 38%;
+    --newyear-silver: 0 0% 20%;
+    --newyear-midnight: 0 0% 5%;
+
+    --gradient-valentine: linear-gradient(180deg, hsl(0 72% 50%) 0%, hsl(0 78% 40%) 100%);
+    --gradient-blush: linear-gradient(180deg, hsl(0 0% 11%) 0%, hsl(0 0% 7%) 100%);
+    --gradient-romantic: linear-gradient(180deg, hsl(0 0% 13%) 0%, hsl(0 0% 9%) 100%);
+
+    --shadow-valentine: 0 6px 18px -6px hsl(0 72% 50% / 0.5);
+    --shadow-rose: 0 4px 14px -4px hsl(0 0% 0% / 0.6);
+
+    --sidebar-background: 0 0% 7%;
+    --sidebar-foreground: 0 0% 96%;
+    --sidebar-primary: 0 72% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 92%;
+    --sidebar-accent-foreground: 0 0% 8%;
+    --sidebar-border: 0 0% 20%;
+    --sidebar-ring: 0 72% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    letter-spacing: 0.005em;
+  }
+  h1, h2, h3 {
+    font-family: 'Oswald', 'Inter', sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+}
+
+@layer utilities {
+  /* Keep mobile-first layout while allowing wider desktop containers. */
+  @media (min-width: 1024px) {
+    .max-w-lg.mx-auto {
+      max-width: 72rem;
+    }
+  }
+
+  /* Font utilities */
+  .font-display {
+    font-family: 'Oswald', 'Inter', sans-serif;
+    letter-spacing: 0.02em;
+  }
+  .font-script {
+    font-family: 'Oswald', 'Inter', sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .font-sans {
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* Gradient utilities */
+  /* Flat industrial fills (gradient class names retained for compatibility) */
+  .gradient-valentine { background: hsl(var(--primary)); }
+  .gradient-blush     { background: hsl(var(--card)); }
+  .gradient-romantic  { background: hsl(var(--card)); }
+  .gradient-warm      { background: hsl(var(--muted)); }
+  .gradient-festive   { background: hsl(var(--foreground)); }
+  .gradient-christmas { background: hsl(var(--foreground)); }
+
+  /* Text gradient */
+  .text-gradient-valentine {
+    background: linear-gradient(135deg, hsl(var(--valentine-rose)) 0%, hsl(var(--valentine-blush)) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .text-gradient-rose {
+    background: linear-gradient(135deg, hsl(var(--valentine-rose-dark)) 0%, hsl(var(--valentine-rose)) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Shadow utilities */
+  .shadow-valentine {
+    box-shadow: var(--shadow-valentine);
+  }
+  .shadow-rose {
+    box-shadow: var(--shadow-rose);
+  }
+  .shadow-newyear {
+    box-shadow: var(--shadow-valentine);
+  }
+  .shadow-gold {
+    box-shadow: var(--shadow-rose);
+  }
+  .glow-valentine {
+    box-shadow: 0 0 40px hsl(var(--valentine-blush) / 0.5);
+  }
+  .glow-rose {
+    box-shadow: 0 0 30px hsl(var(--valentine-rose) / 0.4);
+  }
+  .glow-gold {
+    box-shadow: 0 0 30px hsl(var(--valentine-rose) / 0.3);
+  }
+
+  /* Subtle hover pulse (no scale, just opacity) */
+  @keyframes heartbeat {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.85; }
+  }
+  .animate-heartbeat { animation: none; }
+  .hover-heartbeat:hover {
+    filter: brightness(0.92);
+    transition: filter 0.2s ease;
+  }
+
+  /* Subtle vertical drift (replaces petal-fall, used as fade-up) */
+  @keyframes petal-fall {
+    0% { transform: translateY(0); opacity: 0; }
+    20% { opacity: 0.25; }
+    100% { transform: translateY(-100vh); opacity: 0; }
+  }
+  .animate-petal { animation: petal-fall 18s linear infinite; }
+
+  /* Gentle float — minimized to a slight 2px lift */
+  @keyframes gentle-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-2px); }
+  }
+  .animate-float { animation: gentle-float 4s ease-in-out infinite; }
+
+  /* Soft pulse glow */
+  @keyframes soft-glow {
+    0%, 100% {
+      opacity: 0.4;
+      box-shadow: 0 0 20px hsl(var(--valentine-blush) / 0.3);
+    }
+    50% {
+      opacity: 0.7;
+      box-shadow: 0 0 40px hsl(var(--valentine-rose) / 0.5);
+    }
+  }
+  .animate-soft-glow {
+    animation: soft-glow 3s ease-in-out infinite;
+  }
+
+  /* Shimmer effect */
+  @keyframes shimmer {
+    0% {
+      background-position: -200% center;
+    }
+    100% {
+      background-position: 200% center;
+    }
+  }
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--valentine-blush-light)) 0%,
+      hsl(var(--valentine-rose-light)) 50%,
+      hsl(var(--valentine-blush-light)) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 3s linear infinite;
+  }
+
+  /* Premium locked shimmer overlay */
+  @keyframes premium-shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+  .shimmer-overlay {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+  .shimmer-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(var(--valentine-rose-light) / 0.3) 25%,
+      hsl(var(--valentine-rose) / 0.4) 50%,
+      hsl(var(--valentine-rose-light) / 0.3) 75%,
+      transparent 100%
+    );
+    animation: premium-shimmer 3s ease-in-out infinite;
+  }
+
+  /* Sparkle animation */
+  @keyframes sparkle {
+    0%, 100% {
+      opacity: 0.3;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.8;
+      transform: scale(1.1);
+    }
+  }
+  .animate-sparkle {
+    animation: sparkle 2.5s ease-in-out infinite;
+  }
+
+  /* Fade in with slide */
+  @keyframes fade-slide-up {
+    0% {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-fade-in {
+    animation: fade-slide-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+
+  /* Scale in */
+  @keyframes scale-in {
+    0% {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  .animate-scale-in {
+    animation: scale-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+
+  /* Slide up */
+  @keyframes slide-up {
+    0% {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-slide-up {
+    animation: slide-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+
+  /* Scroll reveal card enhancements */
+  .reveal-card {
+    will-change: transform, opacity;
+  }
+  
+  .reveal-card > div {
+    transition: box-shadow 0.4s ease-out;
+  }
+  
+  .reveal-card:has([data-in-view="true"]) > div {
+    box-shadow: var(--shadow-card), 0 0 20px hsl(var(--valentine-blush) / 0.15);
+  }
+
+  /* Reveal glow effect */
+  .reveal-glow {
+    position: relative;
+  }
+  
+  .reveal-glow::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: linear-gradient(
+      135deg,
+      hsl(var(--valentine-rose) / 0.2) 0%,
+      hsl(var(--valentine-blush) / 0.1) 50%,
+      transparent 100%
+    );
+    opacity: 0;
+    transition: opacity 0.5s ease-out;
+    pointer-events: none;
+    z-index: -1;
+  }
+  
+  .reveal-glow.revealed::after {
+    opacity: 1;
+  }
+
+  /* Holi-themed skeleton pulse animation */
+  @keyframes skeleton-pulse-valentine {
+    0%, 100% {
+      background-position: 200% 0;
+      opacity: 0.6;
+    }
+    50% {
+      background-position: -200% 0;
+      opacity: 0.8;
+    }
+  }
+
+  .skeleton-valentine {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--valentine-blush-light)) 0%,
+      hsl(var(--valentine-rose-light) / 0.5) 25%,
+      hsl(var(--valentine-blush-light)) 50%,
+      hsl(var(--valentine-rose-light) / 0.5) 75%,
+      hsl(var(--valentine-blush-light)) 100%
+    );
+    background-size: 400% 100%;
+    animation: skeleton-pulse-valentine 2.5s ease-in-out infinite;
+  }
+
+  .skeleton-card {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .skeleton-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      135deg,
+      transparent 0%,
+      hsl(var(--valentine-rose) / 0.05) 50%,
+      transparent 100%
+    );
+    animation: skeleton-shimmer 3s ease-in-out infinite;
+  }
+
+  @keyframes skeleton-shimmer {
+    0% {
+      transform: translateX(-100%) rotate(10deg);
+    }
+    100% {
+      transform: translateX(100%) rotate(10deg);
+    }
+  }
+
+  /* Perspective for parallax effects */
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+
+  .perspective-500 {
+    perspective: 500px;
+  }
+}
+
+/* Color splash container (replaces petal container) */
+.petal-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.petal {
+  position: absolute;
+  top: -10%;
+  opacity: 0;
+  animation: petal-fall linear infinite;
+  will-change: transform;
+}
+
+/* Legacy confetti container for compatibility */
+.confetti-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.confetti {
+  position: absolute;
+  font-size: 1rem;
+  animation: petal-fall linear infinite;
+  opacity: 0.7;
+}
