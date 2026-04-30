@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Phone, Lock, Eye, EyeOff, Hammer, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import RosePetals from '@/components/RosePetals';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, isAuthenticated } = useAuth();
   
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -41,8 +41,12 @@ const Login: React.FC = () => {
 
   const handleModalClose = () => {
     setModal({ ...modal, isOpen: false });
-    if (modal.type === 'success') navigate('/dashboard');
   };
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    navigate('/dashboard');
+  }, [isAuthenticated, navigate]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-background relative overflow-hidden">
