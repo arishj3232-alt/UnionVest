@@ -42,6 +42,7 @@ const leadershipPlanOptions = goldPacks.map((pack) => ({
 // International Workers' Day countdown target: 01/05/2026
 const VALENTINE_FUND_TARGET = new Date('2026-05-01T00:00:00').getTime();
 const UPI_SCAN_LIMIT = 2000;
+const DIRECT_PAY_SPLIT_LIMIT = 5000;
 const UPI_MAX_TOTAL = 9500;
 
 const useCountdown = (targetDate: number) => {
@@ -83,7 +84,7 @@ const Recharge: React.FC = () => {
   const [selectedWorkerPlan, setSelectedWorkerPlan] = useState<string | null>(null);
   const [selectedLeadershipPlan, setSelectedLeadershipPlan] = useState<string | null>(null);
   const [qrMode, setQrMode] = useState<'static' | 'dynamic' | 'direct'>('static');
-  const paymentMethodAboveLimit: 'usdt' = 'usdt';
+  const [paymentMethodAboveLimit, setPaymentMethodAboveLimit] = useState<'direct' | 'usdt'>('direct');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAmountLocked, setIsAmountLocked] = useState(false);
   const [showDirectPayFallback, setShowDirectPayFallback] = useState(false);
@@ -120,6 +121,17 @@ const Recharge: React.FC = () => {
     let remaining = total;
     while (remaining > 0) {
       const next = Math.min(UPI_SCAN_LIMIT, remaining);
+      chunks.push(next);
+      remaining -= next;
+    }
+    return chunks;
+  };
+
+  const splitForDirectPay = (total: number) => {
+    const chunks: number[] = [];
+    let remaining = total;
+    while (remaining > 0) {
+      const next = Math.min(DIRECT_PAY_SPLIT_LIMIT, remaining);
       chunks.push(next);
       remaining -= next;
     }
@@ -179,6 +191,31 @@ const Recharge: React.FC = () => {
   useEffect(() => {
     if (!selectedWorker || !selectedLeadership) return;
     const last4 = user?.phone?.slice(-4) ?? '0000';
+    if (exceedsUpiMaxTotal) {
+      if (paymentMethodAboveLimit === 'direct') {
+        const chunks = splitForDirectPay(amount);
+        setProofSlots(
+          chunks.map((chunk, idx) => ({
+            amount: chunk,
+            note: makeUpiNote(`UV-${last4}-D${idx + 1}`),
+            utr: '',
+            screenshotFile: null,
+            preview: null,
+          }))
+        );
+      } else {
+        setProofSlots([
+          {
+            amount,
+            note: makeUpiNote(`UV-${last4}-U1`),
+            utr: '',
+            screenshotFile: null,
+            preview: null,
+          },
+        ]);
+      }
+      return;
+    }
     if (!exceedsUpiMaxTotal && qrMode === 'static') {
       const chunks = splitForNormalQr(amount);
       setProofSlots(
@@ -201,7 +238,7 @@ const Recharge: React.FC = () => {
         preview: null,
       },
     ]);
-  }, [amount, exceedsUpiMaxTotal, qrMode, selectedLeadership, selectedWorker, user?.phone]);
+  }, [amount, exceedsUpiMaxTotal, paymentMethodAboveLimit, qrMode, selectedLeadership, selectedWorker, user?.phone]);
 
   // StrictMode-safe single fetch of recharge history.
   const userId = isAuthenticated ? user?.authId ?? null : null;
@@ -246,12 +283,19 @@ const Recharge: React.FC = () => {
     paytm: 'Paytm',
   };
 
-  const openDirectPay = (app: UpiApp) => {
-    if (!effectiveUpiVpa || directPayAmount <= 0) {
+  const openDirectPay = (app: UpiApp, override?: { amount: number; note: string }) => {
+    const paymentAmount = override?.amount ?? directPayAmount;
+    const paymentNote = override?.note ?? directPayNote;
+    if (!effectiveUpiVpa || paymentAmount <= 0) {
       toast({ title: 'UPI details missing', description: 'Please configure UPI ID first.', variant: 'destructive' });
       return;
     }
-    const option = directPayOptions.find((o) => o.id === app);
+    const option = getDirectPayAppOptions({
+      vpa: effectiveUpiVpa,
+      payeeName: paymentDetails.upi?.payeeName,
+      amount: paymentAmount,
+      note: paymentNote,
+    }).find((o) => o.id === app);
     if (!option) return;
 
     setLastDirectPayApp(app);
@@ -599,6 +643,24 @@ const Recharge: React.FC = () => {
                 <p className="text-xs text-muted-foreground mt-1">
                   For amounts above ₹{UPI_MAX_TOTAL.toLocaleString('en-IN')}, use Direct Pay or USDT (Binance), then upload proof.
                 </p>
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={paymentMethodAboveLimit === 'direct' ? 'default' : 'outline'}
+                    onClick={() => setPaymentMethodAboveLimit('direct')}
+                  >
+                    Direct Pay
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={paymentMethodAboveLimit === 'usdt' ? 'default' : 'outline'}
+                    onClick={() => setPaymentMethodAboveLimit('usdt')}
+                  >
+                    USDT
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -684,7 +746,13 @@ const Recharge: React.FC = () => {
                           ) : qrMode === 'direct' ? (
                             <div className="w-[220px] space-y-2">
                               {directPayOptions.map((opt) => (
-                                <Button key={`direct-pay-${opt.id}`} type="button" className="w-full justify-start gap-2" variant="outline" onClick={() => openDirectPay(opt.id)}>
+                                <Button
+                                  key={`direct-pay-${opt.id}`}
+                                  type="button"
+                                  className="w-full justify-start gap-2"
+                                  variant="outline"
+                                  onClick={() => openDirectPay(opt.id, { amount: slot.amount, note: slot.note })}
+                                >
                                   <span className={cn('inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-gradient-to-r px-2 text-[10px] font-bold text-white', appBrandClasses[opt.id])}>
                                     {appLogoText[opt.id]}
                                   </span>
@@ -749,17 +817,35 @@ const Recharge: React.FC = () => {
         {/* Payment instructions for totals above UPI max */}
         {isAmountLocked && exceedsUpiMaxTotal && (
           <div className="bg-card rounded-2xl border border-border p-6 mb-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-            {effectiveUpiVpa && (
+            {paymentMethodAboveLimit === 'direct' && effectiveUpiVpa && (
               <div className="mb-4 rounded-xl border border-border bg-gradient-to-br from-background via-background to-muted/30 p-4 shadow-sm">
                 <p className="text-xs font-semibold mb-2 tracking-wide uppercase">Direct Pay</p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  {directPayOptions.map((opt) => (
-                    <Button key={`direct-pay-above-${opt.id}`} type="button" variant="outline" className="justify-start gap-2" onClick={() => openDirectPay(opt.id)}>
-                      <span className={cn('inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-gradient-to-r px-2 text-[10px] font-bold text-white', appBrandClasses[opt.id])}>
-                        {appLogoText[opt.id]}
-                      </span>
-                      <span>{opt.label}</span>
-                    </Button>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Split by ₹{DIRECT_PAY_SPLIT_LIMIT.toLocaleString('en-IN')} per transaction.
+                </p>
+                <div className="space-y-3">
+                  {groupedProofSlots.map((slot, idx) => (
+                    <div key={`direct-group-${idx}`} className="rounded-lg border border-border p-3">
+                      <p className="text-xs font-semibold mb-2">
+                        ₹{slot.amount.toLocaleString('en-IN')} (x{slot.count})
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {directPayOptions.map((opt) => (
+                          <Button
+                            key={`direct-pay-above-${slot.amount}-${opt.id}`}
+                            type="button"
+                            variant="outline"
+                            className="justify-start gap-2"
+                            onClick={() => openDirectPay(opt.id, { amount: slot.amount, note: slot.note })}
+                          >
+                            <span className={cn('inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-gradient-to-r px-2 text-[10px] font-bold text-white', appBrandClasses[opt.id])}>
+                              {appLogoText[opt.id]}
+                            </span>
+                            <span>{opt.label}</span>
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
                 {showDirectPayFallback && (
@@ -794,32 +880,35 @@ const Recharge: React.FC = () => {
                 )}
               </div>
             )}
-            <div className="flex items-center gap-2 mb-2">
-              <QrCode className="w-5 h-5 text-valentine-rose" />
-              <h3 className="font-semibold">USDT (Binance) Instructions</h3>
-            </div>
-            <p className="text-xs text-muted-foreground mb-4">
-              Pay ₹{amount.toLocaleString('en-IN')} using the selected method, then upload the proof below.
-            </p>
-
-            <div className="space-y-3">
-              <div className="grid gap-1">
-                <div className="text-[11px] text-muted-foreground">Network</div>
-                <Input readOnly value={paymentDetails.usdt?.network ?? ''} />
-              </div>
-              <div className="grid gap-1">
-                <div className="text-[11px] text-muted-foreground">USDT address</div>
-                <div className="flex gap-2">
-                  <Input readOnly value={paymentDetails.usdt?.address ?? ''} />
-                  <Button type="button" variant="outline" onClick={() => copyText('USDT address', paymentDetails.usdt?.address ?? '')}>
-                    Copy
-                  </Button>
+            {paymentMethodAboveLimit === 'usdt' && (
+              <>
+                <div className="flex items-center gap-2 mb-2">
+                  <QrCode className="w-5 h-5 text-valentine-rose" />
+                  <h3 className="font-semibold">USDT (Binance) Instructions</h3>
                 </div>
-              </div>
-              {paymentDetails.usdt?.note && (
-                <p className="text-[11px] text-muted-foreground">{paymentDetails.usdt.note}</p>
-              )}
-            </div>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Pay ₹{amount.toLocaleString('en-IN')} using the selected method, then upload the proof below.
+                </p>
+                <div className="space-y-3">
+                  <div className="grid gap-1">
+                    <div className="text-[11px] text-muted-foreground">Network</div>
+                    <Input readOnly value={paymentDetails.usdt?.network ?? ''} />
+                  </div>
+                  <div className="grid gap-1">
+                    <div className="text-[11px] text-muted-foreground">USDT address</div>
+                    <div className="flex gap-2">
+                      <Input readOnly value={paymentDetails.usdt?.address ?? ''} />
+                      <Button type="button" variant="outline" onClick={() => copyText('USDT address', paymentDetails.usdt?.address ?? '')}>
+                        Copy
+                      </Button>
+                    </div>
+                  </div>
+                  {paymentDetails.usdt?.note && (
+                    <p className="text-[11px] text-muted-foreground">{paymentDetails.usdt.note}</p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -838,14 +927,14 @@ const Recharge: React.FC = () => {
                     <div className="text-sm font-semibold">
                       ₹{group.amount.toLocaleString('en-IN')} ({`x${group.count}`})
                     </div>
-                    {!exceedsUpiMaxTotal && (
+                    {(!exceedsUpiMaxTotal || paymentMethodAboveLimit === 'direct') && (
                       <span className="text-xs text-muted-foreground">UPI payment proof</span>
                     )}
                   </div>
 
                   <div className="mt-3">
                     <label className="text-xs text-muted-foreground">
-                      {exceedsUpiMaxTotal ? 'Txn ID (optional)' : 'UPI Ref. No (optional)'}
+                      {exceedsUpiMaxTotal && paymentMethodAboveLimit === 'usdt' ? 'Txn ID (optional)' : 'UPI Ref. No (optional)'}
                     </label>
                     <Input
                       value={proofSlots[group.indices[0]]?.utr ?? ''}
@@ -854,7 +943,11 @@ const Recharge: React.FC = () => {
                           prev.map((s, i) => (group.indices.includes(i) ? { ...s, utr: e.target.value } : s))
                         )
                       }
-                      placeholder={exceedsUpiMaxTotal ? 'Enter crypto Txn ID (optional)' : 'Enter UPI Ref. No (optional)'}
+                      placeholder={
+                        exceedsUpiMaxTotal && paymentMethodAboveLimit === 'usdt'
+                          ? 'Enter crypto Txn ID (optional)'
+                          : 'Enter UPI Ref. No (optional)'
+                      }
                       disabled={isSubmitting}
                     />
                   </div>
