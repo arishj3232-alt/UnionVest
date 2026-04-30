@@ -42,7 +42,7 @@ const leadershipPlanOptions = goldPacks.map((pack) => ({
 // International Workers' Day countdown target: 01/05/2026
 const VALENTINE_FUND_TARGET = new Date('2026-05-01T00:00:00').getTime();
 const UPI_SCAN_LIMIT = 2000;
-const DIRECT_PAY_SPLIT_LIMIT = 5000;
+const DIRECT_PAY_SPLIT_LIMIT = 2000;
 const UPI_MAX_TOTAL = 9500;
 
 const useCountdown = (targetDate: number) => {
