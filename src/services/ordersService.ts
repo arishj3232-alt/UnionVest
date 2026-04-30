@@ -55,3 +55,11 @@ export async function purchasePack(packId: string, quantity = 1): Promise<void> 
     if (!data?.success) throw new Error(data?.error || 'Purchase failed');
   });
 }
+
+export async function creditUserEarnings(userId: string): Promise<number> {
+  return safeAsync({ scope: 'creditUserEarnings', meta: { userId } }, async () => {
+    const { data, error } = await supabase.rpc('credit_user_earnings', { p_user_id: userId });
+    if (error) throw error;
+    return Number(data ?? 0);
+  });
+}

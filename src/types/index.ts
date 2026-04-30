@@ -25,6 +25,7 @@ export interface VIPPack {
   isLocked: boolean;
   isPaused?: boolean;
   requiredLevel?: number;
+  maxQuantity?: number;
   image?: string;
 }
 

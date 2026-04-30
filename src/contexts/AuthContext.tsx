@@ -24,6 +24,7 @@ import {
   attachReferralCode,
   validateInvitationCode,
 } from '@/services/profileService';
+import { creditUserEarnings } from '@/services/ordersService';
 
 interface AuthContextType {
   user: User | null;
@@ -76,6 +77,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       const request = (async () => {
         try {
+          // Ensure any pending daily earnings are credited before we read profile values.
+          // Safe to call multiple times; credits only per IST day boundary.
+          await creditUserEarnings(supabaseUser.id);
           const profile = await fetchProfileForSupabaseUser(supabaseUser);
           if (profile) profileCache.set(supabaseUser.id, profile);
           return profile;

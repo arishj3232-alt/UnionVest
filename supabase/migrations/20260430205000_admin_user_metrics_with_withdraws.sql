@@ -1,6 +1,4 @@
--- Admin dashboard user metrics (aggregates across profiles/orders/recharges).
--- NOTE: Postgres cannot CREATE OR REPLACE a function when the RETURN TABLE
--- (OUT parameters) changes. Drop first to allow schema evolution.
+-- Update admin_user_metrics after withdraw_requests exists.
 DROP FUNCTION IF EXISTS public.admin_user_metrics();
 
 CREATE OR REPLACE FUNCTION public.admin_user_metrics()
@@ -42,7 +40,12 @@ AS $$
       WHERE rr.user_id = p.user_id
         AND rr.status = 'approved'
     ) AS deposit_count,
-    0::bigint AS withdraw_count
+    (
+      SELECT COUNT(*)
+      FROM public.withdraw_requests wr
+      WHERE wr.user_id = p.user_id
+        AND wr.status = 'approved'
+    ) AS withdraw_count
   FROM public.profiles p
   LEFT JOIN public.orders o ON o.user_id = p.user_id
   GROUP BY

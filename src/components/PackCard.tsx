@@ -152,6 +152,12 @@ const PackCardImpl: React.FC<PackCardProps> = ({ pack, userHighestSilverLevel = 
           </span>
           <span className="font-bold text-valentine-rose">₹{pack.totalRevenue.toLocaleString()}</span>
         </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Max Quantity</span>
+          <span className="font-semibold text-foreground">
+            {pack.maxQuantity ?? 50}
+          </span>
+        </div>
       </div>
 
       {isActivityLocked && (

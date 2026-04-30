@@ -74,9 +74,24 @@ const Dashboard: React.FC = () => {
   // React to realtime wallet credits (e.g. admin approved a recharge).
   // De-dupe by event timestamp so the toast only fires once per event.
   const lastEventAtRef = useRef<number>(0);
+  const eventSeenStorageKey = userId ? `dashboard:last-realtime-event-at:${userId}` : null;
+
+  useEffect(() => {
+    if (!eventSeenStorageKey) return;
+    const saved = sessionStorage.getItem(eventSeenStorageKey);
+    if (!saved) return;
+    const parsed = Number(saved);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      lastEventAtRef.current = parsed;
+    }
+  }, [eventSeenStorageKey]);
+
   useEffect(() => {
     if (!lastRealtimeEvent || lastRealtimeEvent.at === lastEventAtRef.current) return;
     lastEventAtRef.current = lastRealtimeEvent.at;
+    if (eventSeenStorageKey) {
+      sessionStorage.setItem(eventSeenStorageKey, String(lastRealtimeEvent.at));
+    }
     if (lastRealtimeEvent.kind === 'wallet_credited') {
       playCoin();
       toast({
@@ -95,7 +110,7 @@ const Dashboard: React.FC = () => {
         variant: 'destructive',
       });
     }
-  }, [lastRealtimeEvent, toast]);
+  }, [eventSeenStorageKey, lastRealtimeEvent, toast]);
 
   if (!user) return null;
 
@@ -193,6 +208,15 @@ const Dashboard: React.FC = () => {
         onConfirm={async (quantity) => {
           const purchasedPack = purchaseModal.pack;
           if (!purchasedPack) return;
+          const maxQty = purchasedPack.maxQuantity ?? 50;
+          if (quantity > maxQty) {
+            toast({
+              title: 'Quantity too high',
+              description: `Maximum allowed for ${purchasedPack.name} is ${maxQty}.`,
+              variant: 'destructive',
+            });
+            return;
+          }
           setIsProcessing(true);
           try {
             await purchasePack(purchasedPack.id, quantity);

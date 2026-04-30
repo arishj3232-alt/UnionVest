@@ -8,14 +8,19 @@ import BottomNav from '@/components/BottomNav';
 import RosePetals from '@/components/RosePetals';
 import Modal from '@/components/Modal';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { applyRedeemCode } from '@/services/redeemService';
 
 const Profile: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout, updateUser, isAuthenticated } = useAuth();
+  const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [nickname, setNickname] = useState(user?.nickname || '');
   const [copied, setCopied] = useState(false);
   const [logoutModal, setLogoutModal] = useState(false);
+  const [redeemCode, setRedeemCode] = useState('');
+  const [isRedeeming, setIsRedeeming] = useState(false);
 
   React.useEffect(() => {
     if (!isAuthenticated) {
@@ -41,6 +46,31 @@ const Profile: React.FC = () => {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const onRedeem = async () => {
+    if (!redeemCode.trim()) {
+      toast({ title: 'Please enter a redeem code', variant: 'destructive' });
+      return;
+    }
+    setIsRedeeming(true);
+    try {
+      const creditedAmount = await applyRedeemCode(redeemCode);
+      updateUser({ balance: user.balance + creditedAmount });
+      setRedeemCode('');
+      toast({
+        title: 'Redeem success',
+        description: `₹${creditedAmount.toLocaleString()} added to your wallet.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Redeem failed',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRedeeming(false);
+    }
   };
 
   const menuItems = [
@@ -139,6 +169,26 @@ const Profile: React.FC = () => {
               <p className="text-xs text-muted-foreground">{stat.label}</p>
             </div>
           ))}
+        </div>
+
+        <div className="bg-card rounded-2xl shadow-card border border-border p-4 mb-6">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <p className="font-semibold">Redeem Code</p>
+              <p className="text-xs text-muted-foreground">Enter promo/reward code to claim wallet bonus.</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={redeemCode}
+              onChange={(e) => setRedeemCode(e.target.value)}
+              placeholder="Enter code (e.g. UNIONVEST100)"
+              className="uppercase"
+            />
+            <Button onClick={onRedeem} disabled={isRedeeming}>
+              {isRedeeming ? 'Applying...' : 'Apply'}
+            </Button>
+          </div>
         </div>
 
         {/* Menu Items */}

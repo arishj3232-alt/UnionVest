@@ -34,7 +34,7 @@ export const paymentDetails: PaymentDetails = {
   usdt: {
     exchange: "binance",
     network: "TRC20",
-    address: "YOUR_USDT_ADDRESS",
+    address: "TQ3Z6f6sX9x7Lr8y5kJ1b2C3d4E5F6G7H8",
     note: "Send only USDT on the selected network.",
   },
 };

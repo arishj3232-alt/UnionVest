@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AdminDashboardTab } from './tabs/AdminDashboardTab';
 import { AdminRechargeTab } from './tabs/AdminRechargeTab';
+import { AdminWithdrawTab } from './tabs/AdminWithdrawTab';
 import { AdminUsersTab } from './tabs/AdminUsersTab';
 import { AdminOrdersTab } from './tabs/AdminOrdersTab';
 import { AdminPacksTab } from './tabs/AdminPacksTab';
 import { AdminAmountTab } from './tabs/AdminAmountTab';
 import { AdminContactTab } from './tabs/AdminContactTab';
+import { AdminRedeemTab } from './tabs/AdminRedeemTab';
 import { useAuth } from '@/contexts/AuthContext';
 
 const AdminPanel: React.FC = () => {
@@ -103,11 +105,13 @@ const AdminPanel: React.FC = () => {
           <TabsList className="w-full justify-start overflow-x-auto">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="recharge">Recharge Requests</TabsTrigger>
+            <TabsTrigger value="withdraw">Withdraw Requests</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="orders">Transactions</TabsTrigger>
             <TabsTrigger value="packs">Pack Controls</TabsTrigger>
             <TabsTrigger value="amount">AMOUNT</TabsTrigger>
             <TabsTrigger value="contact">Contact</TabsTrigger>
+            <TabsTrigger value="redeem">Redeem</TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard" className="mt-6">
@@ -115,6 +119,9 @@ const AdminPanel: React.FC = () => {
           </TabsContent>
           <TabsContent value="recharge" className="mt-6">
             <AdminRechargeTab key={`r-${refreshKey}`} onChanged={refresh} />
+          </TabsContent>
+          <TabsContent value="withdraw" className="mt-6">
+            <AdminWithdrawTab key={`w-${refreshKey}`} onChanged={refresh} />
           </TabsContent>
           <TabsContent value="users" className="mt-6">
             <AdminUsersTab key={`u-${refreshKey}`} onChanged={refresh} />
@@ -130,6 +137,9 @@ const AdminPanel: React.FC = () => {
           </TabsContent>
           <TabsContent value="contact" className="mt-6">
             <AdminContactTab key={`c-${refreshKey}`} onChanged={refresh} />
+          </TabsContent>
+          <TabsContent value="redeem" className="mt-6">
+            <AdminRedeemTab key={`rd-${refreshKey}`} onChanged={refresh} />
           </TabsContent>
         </Tabs>
       </motion.main>

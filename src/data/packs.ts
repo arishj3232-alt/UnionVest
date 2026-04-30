@@ -1,19 +1,19 @@
 import { VIPPack } from '@/types';
 
 export const silverPacks: VIPPack[] = [
-  { id: 'silver-1', name: 'Apprentice Tier', category: 'silver', level: 1, price: 1099, dailyEarning: 560, duration: 28, totalRevenue: 15680, isLocked: false },
-  { id: 'silver-2', name: 'Worker Tier',     category: 'silver', level: 2, price: 1499, dailyEarning: 700, duration: 28, totalRevenue: 19600, isLocked: false },
-  { id: 'silver-3', name: 'Craftsman Tier',  category: 'silver', level: 3, price: 2700, dailyEarning: 1000, duration: 28, totalRevenue: 28000, isLocked: false },
-  { id: 'silver-4', name: 'Foreman Tier',    category: 'silver', level: 4, price: 3500, dailyEarning: 1500, duration: 28, totalRevenue: 42000, isLocked: false },
-  { id: 'silver-5', name: 'Union Tier',      category: 'silver', level: 5, price: 3700, dailyEarning: 2200, duration: 28, totalRevenue: 61600, isLocked: false },
+  { id: 'silver-1', name: 'Apprentice Tier', category: 'silver', level: 1, price: 1099, dailyEarning: 560, duration: 28, totalRevenue: 15680, isLocked: false, maxQuantity: 5 },
+  { id: 'silver-2', name: 'Worker Tier',     category: 'silver', level: 2, price: 1499, dailyEarning: 700, duration: 28, totalRevenue: 19600, isLocked: false, maxQuantity: 5 },
+  { id: 'silver-3', name: 'Craftsman Tier',  category: 'silver', level: 3, price: 2700, dailyEarning: 1000, duration: 28, totalRevenue: 28000, isLocked: false, maxQuantity: 5 },
+  { id: 'silver-4', name: 'Foreman Tier',    category: 'silver', level: 4, price: 3500, dailyEarning: 1500, duration: 28, totalRevenue: 42000, isLocked: false, maxQuantity: 5 },
+  { id: 'silver-5', name: 'Union Tier',      category: 'silver', level: 5, price: 3700, dailyEarning: 2200, duration: 28, totalRevenue: 61600, isLocked: false, maxQuantity: 5 },
 ];
 
 export const goldPacks: VIPPack[] = [
-  { id: 'gold-1', name: 'Engineer Plan',  category: 'gold', level: 1, price: 5201, dailyEarning: 3500,  duration: 7, totalRevenue: 24500, isLocked: true, requiredLevel: 1 },
-  { id: 'gold-2', name: 'Operator Plan',  category: 'gold', level: 2, price: 6001, dailyEarning: 4500,  duration: 7, totalRevenue: 31500, isLocked: true, requiredLevel: 2 },
-  { id: 'gold-3', name: 'Supervisor Plan',category: 'gold', level: 3, price: 6800, dailyEarning: 7000,  duration: 7, totalRevenue: 49000, isLocked: true, requiredLevel: 3 },
-  { id: 'gold-4', name: 'Director Plan',  category: 'gold', level: 4, price: 11500, dailyEarning: 15000, duration: 4, totalRevenue: 60000, isLocked: true, requiredLevel: 4 },
-  { id: 'gold-5', name: 'Executive Plan', category: 'gold', level: 5, price: 14300, dailyEarning: 20000, duration: 4, totalRevenue: 80000, isLocked: true, requiredLevel: 5 },
+  { id: 'gold-1', name: 'Engineer Plan',  category: 'gold', level: 1, price: 5201, dailyEarning: 3500,  duration: 7, totalRevenue: 24500, isLocked: true, requiredLevel: 1, maxQuantity: 2 },
+  { id: 'gold-2', name: 'Operator Plan',  category: 'gold', level: 2, price: 6001, dailyEarning: 4500,  duration: 7, totalRevenue: 31500, isLocked: true, requiredLevel: 2, maxQuantity: 2 },
+  { id: 'gold-3', name: 'Supervisor Plan',category: 'gold', level: 3, price: 6800, dailyEarning: 7000,  duration: 7, totalRevenue: 49000, isLocked: true, requiredLevel: 3, maxQuantity: 2 },
+  { id: 'gold-4', name: 'Director Plan',  category: 'gold', level: 4, price: 11500, dailyEarning: 15000, duration: 4, totalRevenue: 60000, isLocked: true, requiredLevel: 4, maxQuantity: 2 },
+  { id: 'gold-5', name: 'Executive Plan', category: 'gold', level: 5, price: 14300, dailyEarning: 20000, duration: 4, totalRevenue: 80000, isLocked: true, requiredLevel: 5, maxQuantity: 2 },
 ];
 
 export const activityPacks: VIPPack[] = [

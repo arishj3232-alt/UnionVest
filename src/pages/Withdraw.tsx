@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAsyncResource } from '@/hooks/useAsyncResource';
 import { fetchPublicAppSettings } from '@/services/appSettingsService';
+import { createWithdrawRequest, fetchWithdrawHistory } from '@/services/withdrawService';
 import BottomNav from '@/components/BottomNav';
 import RosePetals from '@/components/RosePetals';
 import Modal from '@/components/Modal';
@@ -14,13 +15,14 @@ import { cn } from '@/lib/utils';
 const TAX_RATE = 0.05; // 5% tax
 const MIN_WITHDRAWAL = 800;
 
-interface WithdrawTransaction {
+type WithdrawHistoryRow = {
   id: string;
   amount: number;
-  net: number;
-  status: 'pending' | 'approved' | 'rejected';
-  date: string;
-}
+  net_amount: number;
+  status: string;
+  created_at: string;
+  admin_notes: string | null;
+};
 
 const Withdraw: React.FC = () => {
   const navigate = useNavigate();
@@ -42,8 +44,12 @@ const Withdraw: React.FC = () => {
     type: 'info'
   });
 
-  // Withdrawal system not yet implemented - shows empty state
-  const withdrawHistory: WithdrawTransaction[] = [];
+  const userId = isAuthenticated ? user?.authId ?? null : null;
+  const { data: withdrawHistoryData } = useAsyncResource<WithdrawHistoryRow[]>(
+    React.useCallback(() => fetchWithdrawHistory(userId!), [userId]),
+    { key: userId ? `withdraw-history:${userId}` : null }
+  );
+  const withdrawHistory = withdrawHistoryData ?? [];
 
   React.useEffect(() => {
     if (!isAuthenticated) {
@@ -94,12 +100,23 @@ const Withdraw: React.FC = () => {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      // Backend processing not wired yet; keep UX consistent and time-gated.
-      await new Promise((r) => setTimeout(r, 800));
+      const details =
+        paymentMethod === 'upi'
+          ? { upiId: upiId.trim() }
+          : {
+              accountNumber: bankDetails.accountNumber.trim(),
+              ifscCode: bankDetails.ifscCode.trim(),
+              accountName: bankDetails.accountName.trim(),
+            };
+      await createWithdrawRequest({
+        amount: parsedAmount,
+        method: paymentMethod,
+        details,
+      });
       setModal({
         isOpen: true,
         title: 'Withdrawal Requested',
-        message: `Your withdrawal of ₹${netAmount.toFixed(2)} has been submitted.`,
+        message: `Your withdraw request of ₹${netAmount.toFixed(2)} (net) has been submitted. Amount is held until admin processes it.`,
         type: 'success',
       });
       setAmount('');
@@ -331,16 +348,21 @@ const Withdraw: React.FC = () => {
           {withdrawHistory.length > 0 ? (
             <div className="space-y-2">
               {withdrawHistory.map((item) => (
-                <div key={item.id} className="bg-card rounded-xl p-4 border border-border flex items-center justify-between">
+                <div key={item.id} className="bg-card rounded-xl p-4 border border-border flex items-start justify-between gap-4">
                   <div>
-                    <p className="font-semibold">₹{item.net.toLocaleString()}</p>
-                    <p className="text-xs text-muted-foreground">{item.date}</p>
+                    <p className="font-semibold">₹{Number(item.net_amount).toLocaleString('en-IN')}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(item.created_at).toLocaleString()}</p>
+                    {item.status !== 'pending' && item.admin_notes && (
+                      <p className="text-xs text-muted-foreground mt-1 break-words">
+                        Note: {item.admin_notes}
+                      </p>
+                    )}
                   </div>
                   <span className={cn(
                     "text-xs font-medium px-3 py-1 rounded-full",
                     item.status === 'approved' && "bg-valentine-warm/20 text-valentine-warm-dark",
                     item.status === 'pending' && "bg-valentine-rose/10 text-valentine-rose",
-                    item.status === 'rejected' && "bg-destructive/10 text-destructive"
+                    (item.status === 'rejected' || item.status === 'cancelled') && "bg-destructive/10 text-destructive"
                   )}>
                     {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
                   </span>
@@ -349,7 +371,7 @@ const Withdraw: React.FC = () => {
             </div>
           ) : (
             <div className="text-center py-8 bg-muted/30 rounded-xl">
-              <p className="text-muted-foreground text-sm">Withdrawals are not live yet</p>
+              <p className="text-muted-foreground text-sm">No withdrawals yet</p>
             </div>
           )}
         </div>

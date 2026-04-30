@@ -14,7 +14,7 @@ interface Props {
   onRecharge: () => void;
 }
 
-const MAX_QTY = 50;
+const DEFAULT_MAX_QTY = 50;
 
 const PurchaseQuantityModal: React.FC<Props> = ({
   isOpen, pack, walletBalance, isProcessing, onClose, onConfirm, onRecharge,
@@ -25,12 +25,14 @@ const PurchaseQuantityModal: React.FC<Props> = ({
 
   if (!isOpen || !pack) return null;
 
+  const maxQty = pack.maxQuantity ?? DEFAULT_MAX_QTY;
   const total = pack.price * quantity;
   const insufficient = total > walletBalance;
+  const exceedsMax = quantity > maxQty;
   const shortBy = insufficient ? total - walletBalance : 0;
 
   const dec = () => setQuantity((q) => Math.max(1, q - 1));
-  const inc = () => setQuantity((q) => Math.min(MAX_QTY, q + 1));
+  const inc = () => setQuantity((q) => Math.min(maxQty, q + 1));
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -69,11 +71,12 @@ const PurchaseQuantityModal: React.FC<Props> = ({
             <div className="min-w-[64px]">
               <p className="font-display text-4xl font-bold text-foreground tabular-nums">{quantity}</p>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Quantity</p>
+              <p className="text-[10px] text-muted-foreground">Max {maxQty}</p>
             </div>
             <button
               type="button"
               onClick={inc}
-              disabled={isProcessing || quantity >= MAX_QTY}
+              disabled={isProcessing || quantity >= maxQty}
               className="w-11 h-11 rounded-full border-2 border-border flex items-center justify-center hover:border-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
             >
               <Plus className="w-5 h-5" />
@@ -103,6 +106,10 @@ const PurchaseQuantityModal: React.FC<Props> = ({
               <span className="text-muted-foreground">Wallet balance</span>
               <span className="tabular-nums text-muted-foreground">₹{walletBalance.toLocaleString('en-IN')}</span>
             </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Maximum quantity allowed</span>
+              <span className="tabular-nums text-muted-foreground">{maxQty}</span>
+            </div>
           </div>
 
           {insufficient && (
@@ -111,6 +118,16 @@ const PurchaseQuantityModal: React.FC<Props> = ({
               <div className="text-xs">
                 <p className="font-semibold text-destructive">Insufficient balance</p>
                 <p className="text-muted-foreground">Short by ₹{shortBy.toLocaleString('en-IN')}. Recharge to continue.</p>
+              </div>
+            </div>
+          )}
+
+          {exceedsMax && (
+            <div className="flex items-start gap-2 text-left bg-destructive/10 border border-destructive/30 rounded-md p-2.5 mb-4">
+              <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+              <div className="text-xs">
+                <p className="font-semibold text-destructive">Quantity limit exceeded</p>
+                <p className="text-muted-foreground">Maximum allowed for this plan is {maxQty}.</p>
               </div>
             </div>
           )}
@@ -127,7 +144,7 @@ const PurchaseQuantityModal: React.FC<Props> = ({
           ) : (
             <Button
               onClick={() => onConfirm(quantity)}
-              disabled={isProcessing}
+              disabled={isProcessing || exceedsMax}
               variant="valentine"
               size="lg"
               className="w-full uppercase tracking-wider"

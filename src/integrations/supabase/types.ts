@@ -281,6 +281,51 @@ export type Database = {
         }
         Relationships: []
       }
+      withdraw_requests: {
+        Row: {
+          admin_notes: string | null
+          amount: number
+          created_at: string
+          details: Json
+          id: string
+          method: string
+          net_amount: number
+          processed_at: string | null
+          status: string
+          tax_amount: number
+          tax_rate: number
+          user_id: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          amount: number
+          created_at?: string
+          details?: Json
+          id?: string
+          method: string
+          net_amount?: number
+          processed_at?: string | null
+          status?: string
+          tax_amount?: number
+          tax_rate?: number
+          user_id: string
+        }
+        Update: {
+          admin_notes?: string | null
+          amount?: number
+          created_at?: string
+          details?: Json
+          id?: string
+          method?: string
+          net_amount?: number
+          processed_at?: string | null
+          status?: string
+          tax_amount?: number
+          tax_rate?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           granted_at: string
@@ -316,6 +361,52 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_process_withdraw_request: {
+        Args: { p_action: string; p_admin_notes: string; p_request_id: string }
+        Returns: undefined
+      }
+      admin_create_redeem_code: {
+        Args: {
+          p_code: string
+          p_is_active: boolean
+          p_max_claims: number
+          p_reward_amount: number
+        }
+        Returns: string
+      }
+      admin_delete_redeem_code: {
+        Args: { p_code_id: string }
+        Returns: undefined
+      }
+      admin_list_redeem_claims: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          amount: number
+          claim_id: string
+          claimed_at: string
+          code: string
+          code_id: string
+          user_id: string
+          user_nickname: string
+          user_phone: string
+        }[]
+      }
+      admin_list_redeem_codes: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          claims_used: number
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          max_claims: number
+          reward_amount: number
+        }[]
+      }
+      admin_set_redeem_code_active: {
+        Args: { p_code_id: string; p_is_active: boolean }
+        Returns: undefined
+      }
       admin_adjust_user_balance: {
         Args: {
           p_admin_id: string
@@ -394,6 +485,16 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
+      }
+      create_withdraw_request: {
+        Args: { p_amount: number; p_details: Json; p_method: string }
+        Returns: string
+      }
+      credit_user_earnings: { Args: { p_user_id: string }; Returns: number }
+      redeem_code_apply: { Args: { p_code: string }; Returns: number }
+      redeem_code_apply_safe: {
+        Args: { p_code: string }
+        Returns: Json
       }
       validate_invitation_code: { Args: { code: string }; Returns: boolean }
     }

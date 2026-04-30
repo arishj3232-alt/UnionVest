@@ -20,7 +20,7 @@ import {
 } from '@/services/rechargeService';
 import { useAsyncResource } from '@/hooks/useAsyncResource';
 import { useToast } from '@/hooks/use-toast';
-import { buildUpiPayUri, makeUpiNote } from '@/utils/upiUri';
+import { buildUpiPayUri, getDirectPayAppOptions, makeUpiNote, type UpiApp } from '@/utils/upiUri';
 import { fetchPublicAppSettings } from '@/services/appSettingsService';
 
 const workerPlanOptions = silverPacks.map((pack) => ({
@@ -76,23 +76,18 @@ const useCountdown = (targetDate: number) => {
   return timeLeft;
 };
 
-// Convert base64 to File
-const base64ToFile = async (base64: string, filename: string): Promise<File> => {
-  const response = await fetch(base64);
-  const blob = await response.blob();
-  return new File([blob], filename, { type: blob.type });
-};
-
 const Recharge: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [selectedWorkerPlan, setSelectedWorkerPlan] = useState<string | null>(null);
   const [selectedLeadershipPlan, setSelectedLeadershipPlan] = useState<string | null>(null);
-  const [qrMode, setQrMode] = useState<'static' | 'dynamic'>('static');
-  const [paymentMethodAboveLimit, setPaymentMethodAboveLimit] = useState<'bank' | 'usdt'>('bank');
+  const [qrMode, setQrMode] = useState<'static' | 'dynamic' | 'direct'>('static');
+  const paymentMethodAboveLimit: 'usdt' = 'usdt';
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAmountLocked, setIsAmountLocked] = useState(false);
+  const [showDirectPayFallback, setShowDirectPayFallback] = useState(false);
+  const [lastDirectPayApp, setLastDirectPayApp] = useState<UpiApp | null>(null);
   // Local prepend buffer for newly-submitted requests so the UI updates
   // without re-fetching the full history.
   const [historyOverrides, setHistoryOverrides] = useState<RechargeTransaction[]>([]);
@@ -109,7 +104,6 @@ const Recharge: React.FC = () => {
   const amount = (selectedWorker?.price ?? 0) + (selectedLeadership?.price ?? 0);
   const isLevelMismatch = !!selectedWorker && !!selectedLeadership && selectedWorker.level !== selectedLeadership.level;
   const [hasShownMismatchToast, setHasShownMismatchToast] = useState(false);
-  const exceedsUpiScanLimit = amount > UPI_SCAN_LIMIT;
   const exceedsUpiMaxTotal = amount > UPI_MAX_TOTAL;
 
   type ProofSlot = {
@@ -121,35 +115,93 @@ const Recharge: React.FC = () => {
   };
   const [proofSlots, setProofSlots] = useState<ProofSlot[]>([]);
 
-  const buildSplits = (total: number) => {
-    const splits: number[] = [];
+  const splitForNormalQr = (total: number) => {
+    const chunks: number[] = [];
     let remaining = total;
     while (remaining > 0) {
-      const chunk = Math.min(UPI_SCAN_LIMIT, remaining);
-      splits.push(chunk);
-      remaining -= chunk;
+      const next = Math.min(UPI_SCAN_LIMIT, remaining);
+      chunks.push(next);
+      remaining -= next;
     }
-    return splits;
+    return chunks;
+  };
+
+  const groupedProofSlots = React.useMemo(() => {
+    const groups: Array<{ amount: number; count: number; note: string; indices: number[] }> = [];
+    proofSlots.forEach((slot, idx) => {
+      const existing = groups.find((g) => g.amount === slot.amount);
+      if (existing) {
+        existing.count += 1;
+        existing.indices.push(idx);
+      } else {
+        groups.push({ amount: slot.amount, count: 1, note: slot.note, indices: [idx] });
+      }
+    });
+    return groups;
+  }, [proofSlots]);
+
+  const handleGroupedScreenshotUpload = (slotIndices: number[], files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const selected = Array.from(files).slice(0, slotIndices.length);
+    for (const file of selected) {
+      if (file.size > 5 * 1024 * 1024) {
+        setModal({ isOpen: true, title: 'File Too Large', message: 'Please upload images smaller than 5MB.', type: 'error' });
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        setModal({ isOpen: true, title: 'Invalid File Type', message: 'Please upload image files only.', type: 'error' });
+        return;
+      }
+    }
+
+    // Clear old files for this amount group first.
+    setProofSlots((prev) =>
+      prev.map((slot, idx) =>
+        slotIndices.includes(idx) ? { ...slot, screenshotFile: null, preview: null } : slot
+      )
+    );
+
+    selected.forEach((file, i) => {
+      const targetIndex = slotIndices[i];
+      if (targetIndex === undefined) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        setProofSlots((prev) =>
+          prev.map((slot, idx) =>
+            idx === targetIndex ? { ...slot, screenshotFile: file, preview: reader.result as string } : slot
+          )
+        );
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   useEffect(() => {
     if (!selectedWorker || !selectedLeadership) return;
-    if (exceedsUpiMaxTotal) {
-      setProofSlots([{ amount, note: makeUpiNote(`UV-${user?.phone?.slice(-4) ?? '0000'}-A`), utr: '', screenshotFile: null, preview: null }]);
+    const last4 = user?.phone?.slice(-4) ?? '0000';
+    if (!exceedsUpiMaxTotal && qrMode === 'static') {
+      const chunks = splitForNormalQr(amount);
+      setProofSlots(
+        chunks.map((chunk, idx) => ({
+          amount: chunk,
+          note: makeUpiNote(`UV-${last4}-${idx + 1}`),
+          utr: '',
+          screenshotFile: null,
+          preview: null,
+        }))
+      );
       return;
     }
-    const splits = buildSplits(amount);
-    const last4 = user?.phone?.slice(-4) ?? '0000';
-    setProofSlots(
-      splits.map((a, i) => ({
-        amount: a,
-        note: makeUpiNote(`UV-${last4}-${i + 1}`),
+    setProofSlots([
+      {
+        amount,
+        note: makeUpiNote(`UV-${last4}-A`),
         utr: '',
         screenshotFile: null,
         preview: null,
-      }))
-    );
-  }, [amount, exceedsUpiMaxTotal, selectedLeadership, selectedWorker, user?.phone]);
+      },
+    ]);
+  }, [amount, exceedsUpiMaxTotal, qrMode, selectedLeadership, selectedWorker, user?.phone]);
 
   // StrictMode-safe single fetch of recharge history.
   const userId = isAuthenticated ? user?.authId ?? null : null;
@@ -162,6 +214,16 @@ const Recharge: React.FC = () => {
   });
   const rechargeHistory = [...historyOverrides, ...(historyData ?? [])];
   const effectiveUpiVpa = appSettings?.upiVpa?.trim() || paymentDetails.upi?.vpa || '';
+  const directPayAmount = amount;
+  const directPayNote = makeUpiNote(`UV-${user?.phone?.slice(-4) ?? '0000'}-A`);
+  const directPayOptions = effectiveUpiVpa
+    ? getDirectPayAppOptions({
+        vpa: effectiveUpiVpa,
+        payeeName: paymentDetails.upi?.payeeName,
+        amount: directPayAmount,
+        note: directPayNote,
+      })
+    : [];
 
   const copyText = useCallback(async (label: string, value: string) => {
     try {
@@ -171,6 +233,51 @@ const Recharge: React.FC = () => {
       toast({ title: 'Copy failed', description: 'Please copy manually.', variant: 'destructive' });
     }
   }, [toast]);
+
+  const isLikelyMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const appBrandClasses: Record<UpiApp, string> = {
+    gpay: 'from-blue-500 to-green-500',
+    phonepe: 'from-violet-600 to-fuchsia-600',
+    paytm: 'from-sky-500 to-cyan-500',
+  };
+  const appLogoText: Record<UpiApp, string> = {
+    gpay: 'G',
+    phonepe: 'P',
+    paytm: 'Paytm',
+  };
+
+  const openDirectPay = (app: UpiApp) => {
+    if (!effectiveUpiVpa || directPayAmount <= 0) {
+      toast({ title: 'UPI details missing', description: 'Please configure UPI ID first.', variant: 'destructive' });
+      return;
+    }
+    const option = directPayOptions.find((o) => o.id === app);
+    if (!option) return;
+
+    setLastDirectPayApp(app);
+    setShowDirectPayFallback(false);
+
+    // Custom app URI schemes generally do not work on desktop browsers.
+    // Avoid repeated "scheme does not have a registered handler" errors.
+    if (!isLikelyMobileDevice) {
+      setShowDirectPayFallback(true);
+      toast({
+        title: 'Direct app launch unavailable',
+        description: 'Use the fallback options below or scan QR from your phone.',
+      });
+      return;
+    }
+
+    const hiddenBefore = document.hidden;
+    window.location.href = option.uri;
+
+    window.setTimeout(() => {
+      // If tab is still visible, app likely did not open.
+      if (!hiddenBefore && !document.hidden) {
+        setShowDirectPayFallback(true);
+      }
+    }, 1200);
+  };
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -484,60 +591,21 @@ const Recharge: React.FC = () => {
         {/* Lock Amount Button */}
         {!isAmountLocked && (
           <div className="space-y-3 mb-6">
-            {!exceedsUpiMaxTotal && exceedsUpiScanLimit && (
-              <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
-                <p className="text-sm font-semibold text-foreground">
-                  Your total is above ₹{UPI_SCAN_LIMIT.toLocaleString('en-IN')}.
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Many UPI apps/banks limit QR scan payments to ₹{UPI_SCAN_LIMIT.toLocaleString('en-IN')} per transaction.
-                  Your UPI app may require split payments.
-                </p>
-              </div>
-            )}
             {exceedsUpiMaxTotal && (
               <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
                 <p className="text-sm font-semibold text-foreground">
                   Total is above ₹{UPI_MAX_TOTAL.toLocaleString('en-IN')}.
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  For amounts above ₹{UPI_MAX_TOTAL.toLocaleString('en-IN')}, use Bank transfer or USDT (Binance) and upload proof.
+                  For amounts above ₹{UPI_MAX_TOTAL.toLocaleString('en-IN')}, use Direct Pay or USDT (Binance), then upload proof.
                 </p>
-                <div className="flex gap-2 mt-3">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={paymentMethodAboveLimit === 'bank' ? 'default' : 'outline'}
-                    onClick={() => setPaymentMethodAboveLimit('bank')}
-                  >
-                    Bank
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={paymentMethodAboveLimit === 'usdt' ? 'default' : 'outline'}
-                    onClick={() => setPaymentMethodAboveLimit('usdt')}
-                  >
-                    USDT
-                  </Button>
-                </div>
               </div>
             )}
 
             <Button
               variant="rose"
               className="w-full"
-              onClick={() => {
-                if (!exceedsUpiMaxTotal && exceedsUpiScanLimit) {
-                  setModal({
-                    isOpen: true,
-                    title: 'UPI limit note',
-                    message: `Your UPI app may require split payments for amounts above ₹${UPI_SCAN_LIMIT.toLocaleString('en-IN')}.`,
-                    type: 'info',
-                  });
-                }
-                handleLockAmount();
-              }}
+              onClick={handleLockAmount}
             >
               <Lock className="w-4 h-4 mr-2" />
               Lock Amount & Show QR
@@ -547,7 +615,7 @@ const Recharge: React.FC = () => {
 
         {/* UPI QR section (Normal + Dynamic optional) */}
         {isAmountLocked && !exceedsUpiMaxTotal && (
-          <div className="bg-card rounded-2xl border border-border p-6 mb-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+          <div className="bg-gradient-to-br from-background via-background to-primary/5 rounded-2xl border border-border p-6 mb-6 animate-fade-in shadow-sm" style={{ animationDelay: '0.2s' }}>
             <div className="flex items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-2">
                 <QrCode className="w-5 h-5 text-valentine-rose" />
@@ -575,16 +643,14 @@ const Recharge: React.FC = () => {
               >
                 Dynamic QR
               </Button>
-              {effectiveUpiVpa && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => copyText('UPI ID', effectiveUpiVpa)}
-                >
-                  Copy UPI ID
-                </Button>
-              )}
+              <Button
+                type="button"
+                size="sm"
+                variant={qrMode === 'direct' ? 'default' : 'outline'}
+                onClick={() => setQrMode('direct')}
+              >
+                Direct Pay
+              </Button>
             </div>
 
             {!effectiveUpiVpa ? (
@@ -593,7 +659,7 @@ const Recharge: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {proofSlots.map((slot, idx) => {
+                {groupedProofSlots.map((slot, idx) => {
                   const uri = buildUpiPayUri({
                     vpa: effectiveUpiVpa,
                     payeeName: paymentDetails.upi!.payeeName,
@@ -604,7 +670,7 @@ const Recharge: React.FC = () => {
                     <div key={idx} className="rounded-2xl border border-border p-4">
                       <div className="flex items-center justify-between gap-3">
                         <div className="font-semibold text-sm">
-                          Payment {idx + 1}: ₹{slot.amount.toLocaleString('en-IN')}
+                          ₹{slot.amount.toLocaleString('en-IN')} {slot.count > 1 ? `(x${slot.count})` : '(x1)'}
                         </div>
                         <div className="text-[11px] text-muted-foreground">
                           Note: <span className="font-semibold">{slot.note}</span>
@@ -615,6 +681,17 @@ const Recharge: React.FC = () => {
                         <div className="bg-card rounded-xl p-3 inline-block border border-border">
                           {qrMode === 'dynamic' ? (
                             <QRCode value={uri} size={220} />
+                          ) : qrMode === 'direct' ? (
+                            <div className="w-[220px] space-y-2">
+                              {directPayOptions.map((opt) => (
+                                <Button key={`direct-pay-${opt.id}`} type="button" className="w-full justify-start gap-2" variant="outline" onClick={() => openDirectPay(opt.id)}>
+                                  <span className={cn('inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-gradient-to-r px-2 text-[10px] font-bold text-white', appBrandClasses[opt.id])}>
+                                    {appLogoText[opt.id]}
+                                  </span>
+                                  <span>{opt.label}</span>
+                                </Button>
+                              ))}
+                            </div>
                           ) : (
                             <img
                               src={appSettings?.staticQrUrl || paymentQR}
@@ -625,20 +702,45 @@ const Recharge: React.FC = () => {
                         </div>
                       </div>
 
-                      {qrMode !== 'dynamic' && (
+                      {qrMode === 'static' && (
                         <p className="text-[11px] text-muted-foreground mt-3 text-center">
                           UPI ID: <span className="font-semibold">{effectiveUpiVpa}</span>
                         </p>
                       )}
 
-                      {exceedsUpiScanLimit && (
-                        <p className="text-[11px] text-muted-foreground mt-2 text-center">
-                          If your UPI app limits QR scan payments to ₹{UPI_SCAN_LIMIT.toLocaleString('en-IN')}, use the split payments shown above.
-                        </p>
-                      )}
                     </div>
                   );
                 })}
+                {qrMode === 'direct' && showDirectPayFallback && (
+                  <div className="rounded-xl border border-border bg-muted/20 p-3">
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Could not open {lastDirectPayApp ? directPayOptions.find((o) => o.id === lastDirectPayApp)?.label : 'selected app'} automatically. Use these links:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {directPayOptions.map((opt) => {
+                        const disabledForDesktop = !isLikelyMobileDevice;
+                        return (
+                          <button
+                            key={`${opt.id}-fallback`}
+                            type="button"
+                            onClick={() => openDirectPay(opt.id)}
+                            disabled={disabledForDesktop}
+                            className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={disabledForDesktop ? 'Open this link from mobile browser' : undefined}
+                          >
+                            Open {opt.label}
+                          </button>
+                        );
+                      })}
+                      <a
+                        href={directPayOptions[0]?.fallbackUri}
+                        className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
+                      >
+                        Open Generic UPI
+                      </a>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -647,75 +749,77 @@ const Recharge: React.FC = () => {
         {/* Payment instructions for totals above UPI max */}
         {isAmountLocked && exceedsUpiMaxTotal && (
           <div className="bg-card rounded-2xl border border-border p-6 mb-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+            {effectiveUpiVpa && (
+              <div className="mb-4 rounded-xl border border-border bg-gradient-to-br from-background via-background to-muted/30 p-4 shadow-sm">
+                <p className="text-xs font-semibold mb-2 tracking-wide uppercase">Direct Pay</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {directPayOptions.map((opt) => (
+                    <Button key={`direct-pay-above-${opt.id}`} type="button" variant="outline" className="justify-start gap-2" onClick={() => openDirectPay(opt.id)}>
+                      <span className={cn('inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-gradient-to-r px-2 text-[10px] font-bold text-white', appBrandClasses[opt.id])}>
+                        {appLogoText[opt.id]}
+                      </span>
+                      <span>{opt.label}</span>
+                    </Button>
+                  ))}
+                </div>
+                {showDirectPayFallback && (
+                  <div className="mt-3 rounded-lg border border-border bg-background/60 p-2">
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Could not open {lastDirectPayApp ? directPayOptions.find((o) => o.id === lastDirectPayApp)?.label : 'selected app'} automatically. Use these links:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {directPayOptions.map((opt) => {
+                        const disabledForDesktop = !isLikelyMobileDevice;
+                        return (
+                          <button
+                            key={`direct-pay-above-fallback-${opt.id}`}
+                            type="button"
+                            onClick={() => openDirectPay(opt.id)}
+                            disabled={disabledForDesktop}
+                            className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={disabledForDesktop ? 'Open this link from mobile browser' : undefined}
+                          >
+                            Open {opt.label}
+                          </button>
+                        );
+                      })}
+                      <a
+                        href={directPayOptions[0]?.fallbackUri}
+                        className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
+                      >
+                        Open Generic UPI
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex items-center gap-2 mb-2">
               <QrCode className="w-5 h-5 text-valentine-rose" />
-              <h3 className="font-semibold">
-                {paymentMethodAboveLimit === 'bank' ? 'Bank Transfer' : 'USDT (Binance)'} Instructions
-              </h3>
+              <h3 className="font-semibold">USDT (Binance) Instructions</h3>
             </div>
             <p className="text-xs text-muted-foreground mb-4">
               Pay ₹{amount.toLocaleString('en-IN')} using the selected method, then upload the proof below.
             </p>
 
-            {paymentMethodAboveLimit === 'bank' ? (
-              <div className="space-y-3">
-                <div className="grid gap-1">
-                  <div className="text-[11px] text-muted-foreground">Account name</div>
-                  <div className="flex gap-2">
-                    <Input readOnly value={paymentDetails.bank?.accountName ?? ''} />
-                    <Button type="button" variant="outline" onClick={() => copyText('Account name', paymentDetails.bank?.accountName ?? '')}>
-                      Copy
-                    </Button>
-                  </div>
-                </div>
-                <div className="grid gap-1">
-                  <div className="text-[11px] text-muted-foreground">Bank</div>
-                  <div className="flex gap-2">
-                    <Input readOnly value={paymentDetails.bank?.bankName ?? ''} />
-                    <Button type="button" variant="outline" onClick={() => copyText('Bank', paymentDetails.bank?.bankName ?? '')}>
-                      Copy
-                    </Button>
-                  </div>
-                </div>
-                <div className="grid gap-1">
-                  <div className="text-[11px] text-muted-foreground">Account number</div>
-                  <div className="flex gap-2">
-                    <Input readOnly value={paymentDetails.bank?.accountNumber ?? ''} />
-                    <Button type="button" variant="outline" onClick={() => copyText('Account number', paymentDetails.bank?.accountNumber ?? '')}>
-                      Copy
-                    </Button>
-                  </div>
-                </div>
-                <div className="grid gap-1">
-                  <div className="text-[11px] text-muted-foreground">IFSC</div>
-                  <div className="flex gap-2">
-                    <Input readOnly value={paymentDetails.bank?.ifsc ?? ''} />
-                    <Button type="button" variant="outline" onClick={() => copyText('IFSC', paymentDetails.bank?.ifsc ?? '')}>
-                      Copy
-                    </Button>
-                  </div>
+            <div className="space-y-3">
+              <div className="grid gap-1">
+                <div className="text-[11px] text-muted-foreground">Network</div>
+                <Input readOnly value={paymentDetails.usdt?.network ?? ''} />
+              </div>
+              <div className="grid gap-1">
+                <div className="text-[11px] text-muted-foreground">USDT address</div>
+                <div className="flex gap-2">
+                  <Input readOnly value={paymentDetails.usdt?.address ?? ''} />
+                  <Button type="button" variant="outline" onClick={() => copyText('USDT address', paymentDetails.usdt?.address ?? '')}>
+                    Copy
+                  </Button>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="grid gap-1">
-                  <div className="text-[11px] text-muted-foreground">Network</div>
-                  <Input readOnly value={paymentDetails.usdt?.network ?? ''} />
-                </div>
-                <div className="grid gap-1">
-                  <div className="text-[11px] text-muted-foreground">USDT address</div>
-                  <div className="flex gap-2">
-                    <Input readOnly value={paymentDetails.usdt?.address ?? ''} />
-                    <Button type="button" variant="outline" onClick={() => copyText('USDT address', paymentDetails.usdt?.address ?? '')}>
-                      Copy
-                    </Button>
-                  </div>
-                </div>
-                {paymentDetails.usdt?.note && (
-                  <p className="text-[11px] text-muted-foreground">{paymentDetails.usdt.note}</p>
-                )}
-              </div>
-            )}
+              {paymentDetails.usdt?.note && (
+                <p className="text-[11px] text-muted-foreground">{paymentDetails.usdt.note}</p>
+              )}
+            </div>
           </div>
         )}
 
@@ -728,27 +832,29 @@ const Recharge: React.FC = () => {
             </h3>
 
             <div className="space-y-4">
-              {proofSlots.map((slot, idx) => (
-                <div key={idx} className="rounded-2xl border border-border bg-card p-4">
+              {groupedProofSlots.map((group, idx) => (
+                <div key={`${group.amount}-${idx}`} className="rounded-2xl border border-border bg-card p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-sm font-semibold">
-                      {exceedsUpiMaxTotal ? 'Payment' : `Payment ${idx + 1}`} — ₹{slot.amount.toLocaleString('en-IN')}
+                      ₹{group.amount.toLocaleString('en-IN')} ({`x${group.count}`})
                     </div>
                     {!exceedsUpiMaxTotal && (
-                      <span className="text-xs text-muted-foreground">UPI QR split</span>
+                      <span className="text-xs text-muted-foreground">UPI payment proof</span>
                     )}
                   </div>
 
                   <div className="mt-3">
-                    <label className="text-xs text-muted-foreground">Transaction reference (optional)</label>
+                    <label className="text-xs text-muted-foreground">
+                      {exceedsUpiMaxTotal ? 'Txn ID (optional)' : 'UPI Ref. No (optional)'}
+                    </label>
                     <Input
-                      value={slot.utr}
+                      value={proofSlots[group.indices[0]]?.utr ?? ''}
                       onChange={(e) =>
                         setProofSlots((prev) =>
-                          prev.map((s, i) => (i === idx ? { ...s, utr: e.target.value } : s))
+                          prev.map((s, i) => (group.indices.includes(i) ? { ...s, utr: e.target.value } : s))
                         )
                       }
-                      placeholder="UTR / Txn ID (optional)"
+                      placeholder={exceedsUpiMaxTotal ? 'Enter crypto Txn ID (optional)' : 'Enter UPI Ref. No (optional)'}
                       disabled={isSubmitting}
                     />
                   </div>
@@ -756,31 +862,42 @@ const Recharge: React.FC = () => {
                   <label
                     className={cn(
                       "mt-3 flex flex-col items-center justify-center border-2 border-dashed rounded-2xl p-6 cursor-pointer transition-all duration-300",
-                      slot.preview
+                      group.indices.some((i) => !!proofSlots[i]?.preview)
                         ? "border-valentine-warm-dark bg-valentine-warm/20"
                         : "border-border hover:border-valentine-rose hover:bg-valentine-rose/5"
                     )}
                   >
-                    {slot.preview ? (
+                    {group.indices.some((i) => !!proofSlots[i]?.preview) ? (
                       <>
                         <Check className="w-10 h-10 text-valentine-warm-dark mb-2" />
-                        <p className="text-valentine-warm-dark font-medium">Screenshot Uploaded</p>
-                        <img src={slot.preview} alt="Payment proof" className="mt-3 max-h-32 rounded-lg" />
+                        <p className="text-valentine-warm-dark font-medium">
+                          {group.indices.filter((i) => !!proofSlots[i]?.screenshotFile).length} / {group.count} screenshot(s) uploaded
+                        </p>
+                        <div className="mt-3 grid grid-cols-3 gap-2">
+                          {group.indices
+                            .map((i) => proofSlots[i]?.preview)
+                            .filter(Boolean)
+                            .map((preview, pIdx) => (
+                              <img key={pIdx} src={preview as string} alt="Payment proof" className="h-16 w-16 rounded-lg object-cover" />
+                            ))}
+                        </div>
                       </>
                     ) : (
                       <>
                         <Upload className="w-10 h-10 text-muted-foreground mb-2" />
-                        <p className="text-muted-foreground">Tap to upload screenshot</p>
+                        <p className="text-muted-foreground">
+                          Tap to upload {group.count > 1 ? `${group.count} screenshots` : 'screenshot'}
+                        </p>
                         <p className="text-xs text-muted-foreground mt-1">Max 5MB, images only</p>
                       </>
                     )}
                     <input
                       type="file"
                       accept="image/*"
+                      multiple={group.count > 1}
                       className="hidden"
                       onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleScreenshotUploadForSlot(idx, file);
+                        handleGroupedScreenshotUpload(group.indices, e.target.files);
                       }}
                     />
                   </label>
