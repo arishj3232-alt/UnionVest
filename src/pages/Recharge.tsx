@@ -7,7 +7,6 @@ import BottomNav from '@/components/BottomNav';
 import RosePetals from '@/components/RosePetals';
 import Modal from '@/components/Modal';
 import { cn } from '@/lib/utils';
-import paymentQR from '@/assets/payment-qr.png';
 import { goldPacks, silverPacks } from '@/data/packs';
 import { Input } from '@/components/ui/input';
 import { paymentDetails } from '@/config/paymentDetails';
@@ -42,8 +41,10 @@ const leadershipPlanOptions = goldPacks.map((pack) => ({
 // International Workers' Day countdown target: 01/05/2026
 const VALENTINE_FUND_TARGET = new Date('2026-05-01T00:00:00').getTime();
 const UPI_SCAN_LIMIT = 2000;
-const DIRECT_PAY_SPLIT_LIMIT = 2000;
+const DIRECT_PAY_SPLIT_LIMIT = 5000;
 const UPI_MAX_TOTAL = 9500;
+const PAYMENT_PROOF_MAX_MB = 30;
+const PAYMENT_PROOF_MAX_BYTES = PAYMENT_PROOF_MAX_MB * 1024 * 1024;
 
 const useCountdown = (targetDate: number) => {
   const [timeLeft, setTimeLeft] = useState({
@@ -89,6 +90,7 @@ const Recharge: React.FC = () => {
   const [isAmountLocked, setIsAmountLocked] = useState(false);
   const [showDirectPayFallback, setShowDirectPayFallback] = useState(false);
   const [lastDirectPayApp, setLastDirectPayApp] = useState<UpiApp | null>(null);
+  const [appSettingsRefreshTick, setAppSettingsRefreshTick] = useState(0);
   // Local prepend buffer for newly-submitted requests so the UI updates
   // without re-fetching the full history.
   const [historyOverrides, setHistoryOverrides] = useState<RechargeTransaction[]>([]);
@@ -156,8 +158,8 @@ const Recharge: React.FC = () => {
     if (!files || files.length === 0) return;
     const selected = Array.from(files).slice(0, slotIndices.length);
     for (const file of selected) {
-      if (file.size > 5 * 1024 * 1024) {
-        setModal({ isOpen: true, title: 'File Too Large', message: 'Please upload images smaller than 5MB.', type: 'error' });
+      if (file.size > PAYMENT_PROOF_MAX_BYTES) {
+        setModal({ isOpen: true, title: 'File Too Large', message: `Please upload images smaller than ${PAYMENT_PROOF_MAX_MB}MB.`, type: 'error' });
         return;
       }
       if (!file.type.startsWith('image/')) {
@@ -246,11 +248,35 @@ const Recharge: React.FC = () => {
     useCallback(() => fetchRechargeHistory(userId!), [userId]),
     { key: userId ? `recharge-history:${userId}` : null }
   );
+  useEffect(() => {
+    const refresh = () => setAppSettingsRefreshTick((prev) => prev + 1);
+    const timer = window.setInterval(refresh, 30000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
+
   const { data: appSettings } = useAsyncResource(fetchPublicAppSettings, {
-    key: 'recharge:public-app-settings',
+    key: `recharge:public-app-settings:${appSettingsRefreshTick}`,
   });
   const rechargeHistory = [...historyOverrides, ...(historyData ?? [])];
-  const effectiveUpiVpa = appSettings?.upiVpa?.trim() || paymentDetails.upi?.vpa || '';
+  const effectiveUpiVpa = appSettings?.upiVpa?.trim() || '';
+  const upiQrStatus = appSettings?.upiQrStatus ?? 'enabled';
+  const directPayStatus = appSettings?.directPayStatus ?? 'disabled';
+  const usdtStatus = appSettings?.usdtStatus ?? 'enabled';
+  const upiQrAvailable = upiQrStatus === 'enabled';
+  const directPayAvailable = directPayStatus === 'enabled';
+  const usdtAvailable = usdtStatus === 'enabled';
+  const upiQrOutOfService = upiQrStatus === 'out_of_service';
+  const directPayOutOfService = directPayStatus === 'out_of_service';
+  const usdtOutOfService = usdtStatus === 'out_of_service';
   const directPayAmount = amount;
   const directPayNote = makeUpiNote(`UV-${user?.phone?.slice(-4) ?? '0000'}-A`);
   const directPayOptions = effectiveUpiVpa
@@ -377,6 +403,24 @@ const Recharge: React.FC = () => {
       });
       return;
     }
+    if (!exceedsUpiMaxTotal && !upiQrAvailable && !directPayAvailable) {
+      setModal({
+        isOpen: true,
+        title: 'Payment methods unavailable',
+        message: 'UPI QR and Direct Pay are currently disabled. Please contact support.',
+        type: 'error',
+      });
+      return;
+    }
+    if (exceedsUpiMaxTotal && !directPayAvailable && !usdtAvailable) {
+      setModal({
+        isOpen: true,
+        title: 'Payment methods unavailable',
+        message: 'Direct Pay and USDT are currently disabled. Please contact support.',
+        type: 'error',
+      });
+      return;
+    }
     setIsAmountLocked(true);
   };
 
@@ -384,9 +428,61 @@ const Recharge: React.FC = () => {
     setIsAmountLocked(false);
   };
 
+  const downloadLockedQr = async (containerId: string, filename: string) => {
+    try {
+      const container = document.getElementById(containerId);
+      const svg = container?.querySelector('svg');
+      if (!svg) throw new Error('QR not found');
+
+      const serializer = new XMLSerializer();
+      const svgMarkup = serializer.serializeToString(svg);
+      const svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+      const svgUrl = URL.createObjectURL(svgBlob);
+
+      const image = new Image();
+      image.crossOrigin = 'anonymous';
+      const imageLoaded = new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error('QR render failed'));
+      });
+      image.src = svgUrl;
+      await imageLoaded;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = 1024;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas unavailable');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(image, 64, 64, 896, 896);
+      URL.revokeObjectURL(svgUrl);
+
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Export failed'))), 'image/png');
+      });
+
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      setModal({
+        isOpen: true,
+        title: 'Download failed',
+        message: 'Could not download QR right now. Please try again.',
+        type: 'error',
+      });
+    }
+  };
+
   const handleScreenshotUploadForSlot = (slotIndex: number, file: File) => {
-    if (file.size > 5 * 1024 * 1024) {
-      setModal({ isOpen: true, title: 'File Too Large', message: 'Please upload an image smaller than 5MB.', type: 'error' });
+    if (file.size > PAYMENT_PROOF_MAX_BYTES) {
+      setModal({ isOpen: true, title: 'File Too Large', message: `Please upload an image smaller than ${PAYMENT_PROOF_MAX_MB}MB.`, type: 'error' });
       return;
     }
     if (!file.type.startsWith('image/')) {
@@ -447,7 +543,11 @@ const Recharge: React.FC = () => {
         user.authId,
         amount,
         uploaded.map((u) => ({
-          method: exceedsUpiMaxTotal ? paymentMethodAboveLimit : 'upi_qr',
+          method: exceedsUpiMaxTotal
+            ? paymentMethodAboveLimit === 'direct'
+              ? 'upi_qr'
+              : 'usdt'
+            : 'upi_qr',
           amount: u.amount,
           screenshot_url: u.screenshot_url,
           reference: u.utr ? `${u.note}|${u.utr}` : u.note,
@@ -694,6 +794,8 @@ const Recharge: React.FC = () => {
                 size="sm"
                 variant={qrMode === 'static' ? 'default' : 'outline'}
                 onClick={() => setQrMode('static')}
+                disabled={!upiQrAvailable}
+                title={upiQrOutOfService ? 'UPI QR is out of service' : !upiQrAvailable ? 'UPI QR is disabled' : undefined}
               >
                 Normal QR
               </Button>
@@ -702,6 +804,8 @@ const Recharge: React.FC = () => {
                 size="sm"
                 variant={qrMode === 'dynamic' ? 'default' : 'outline'}
                 onClick={() => setQrMode('dynamic')}
+                disabled={!upiQrAvailable}
+                title={upiQrOutOfService ? 'UPI QR is out of service' : !upiQrAvailable ? 'UPI QR is disabled' : undefined}
               >
                 Dynamic QR
               </Button>
@@ -710,10 +814,22 @@ const Recharge: React.FC = () => {
                 size="sm"
                 variant={qrMode === 'direct' ? 'default' : 'outline'}
                 onClick={() => setQrMode('direct')}
+                disabled={!directPayAvailable}
+                title={directPayOutOfService ? 'Direct Pay is out of service' : !directPayAvailable ? 'Direct Pay is disabled' : undefined}
               >
                 Direct Pay
               </Button>
             </div>
+            {!upiQrAvailable && (
+              <p className="text-xs text-muted-foreground mb-2">
+                {upiQrOutOfService ? 'UPI QR is currently out of service.' : 'UPI QR is currently disabled by admin.'}
+              </p>
+            )}
+            {!directPayAvailable && (
+              <p className="text-xs text-muted-foreground mb-2">
+                {directPayOutOfService ? 'Direct Pay is currently out of service.' : 'Direct Pay is currently disabled by admin.'}
+              </p>
+            )}
 
             {!effectiveUpiVpa ? (
               <div className="text-sm text-destructive">
@@ -761,19 +877,36 @@ const Recharge: React.FC = () => {
                               ))}
                             </div>
                           ) : (
-                            <img
-                              src={appSettings?.staticQrUrl || paymentQR}
-                              alt="UPI QR"
-                              className="w-[220px] h-[220px] object-contain rounded-lg"
-                            />
+                            <div className="w-[220px] space-y-3">
+                              <div id={`normal-locked-qr-${idx}`} className="rounded-lg border border-primary/30 bg-background p-2">
+                                <QRCode value={uri} size={200} />
+                                <p className="mt-1 text-[10px] text-center text-muted-foreground">Merchant QR</p>
+                              </div>
+                            </div>
                           )}
                         </div>
                       </div>
 
                       {qrMode === 'static' && (
-                        <p className="text-[11px] text-muted-foreground mt-3 text-center">
-                          UPI ID: <span className="font-semibold">{effectiveUpiVpa}</span>
-                        </p>
+                        <div className="mt-3 space-y-2 text-center">
+                          <p className="text-[11px] text-muted-foreground">
+                            UPI ID: <span className="font-semibold">{effectiveUpiVpa}</span>
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs"
+                            onClick={() =>
+                              downloadLockedQr(
+                                `normal-locked-qr-${idx}`,
+                                `unionvest-locked-qr-${slot.amount}.png`
+                              )
+                            }
+                          >
+                            Download QR
+                          </Button>
+                        </div>
                       )}
 
                     </div>
@@ -817,7 +950,7 @@ const Recharge: React.FC = () => {
         {/* Payment instructions for totals above UPI max */}
         {isAmountLocked && exceedsUpiMaxTotal && (
           <div className="bg-card rounded-2xl border border-border p-6 mb-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-            {paymentMethodAboveLimit === 'direct' && effectiveUpiVpa && (
+            {paymentMethodAboveLimit === 'direct' && directPayAvailable && effectiveUpiVpa && (
               <div className="mb-4 rounded-xl border border-border bg-gradient-to-br from-background via-background to-muted/30 p-4 shadow-sm">
                 <p className="text-xs font-semibold mb-2 tracking-wide uppercase">Direct Pay</p>
                 <p className="text-xs text-muted-foreground mb-2">
@@ -880,7 +1013,7 @@ const Recharge: React.FC = () => {
                 )}
               </div>
             )}
-            {paymentMethodAboveLimit === 'usdt' && (
+            {paymentMethodAboveLimit === 'usdt' && usdtAvailable && (
               <>
                 <div className="flex items-center gap-2 mb-2">
                   <QrCode className="w-5 h-5 text-valentine-rose" />
@@ -908,6 +1041,16 @@ const Recharge: React.FC = () => {
                   )}
                 </div>
               </>
+            )}
+            {paymentMethodAboveLimit === 'direct' && !directPayAvailable && (
+              <p className="text-sm text-muted-foreground">
+                {directPayOutOfService ? 'Direct Pay is currently out of service.' : 'Direct Pay is currently disabled by admin.'}
+              </p>
+            )}
+            {paymentMethodAboveLimit === 'usdt' && !usdtAvailable && (
+              <p className="text-sm text-muted-foreground">
+                {usdtOutOfService ? 'USDT is currently out of service.' : 'USDT is currently disabled by admin.'}
+              </p>
             )}
           </div>
         )}
@@ -981,7 +1124,7 @@ const Recharge: React.FC = () => {
                         <p className="text-muted-foreground">
                           Tap to upload {group.count > 1 ? `${group.count} screenshots` : 'screenshot'}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-1">Max 5MB, images only</p>
+                        <p className="text-xs text-muted-foreground mt-1">Max 30MB, images only</p>
                       </>
                     )}
                     <input

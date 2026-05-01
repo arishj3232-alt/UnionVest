@@ -60,17 +60,20 @@ const HelpSupport: React.FC = () => {
     },
   ];
 
+  const telegramIdRaw = (appSettings?.telegramId ?? '').trim();
+  const normalizedTelegramId = telegramIdRaw.startsWith('@') ? telegramIdRaw.slice(1) : telegramIdRaw;
+  const hasTelegramContact = normalizedTelegramId.length > 0;
+
   const contactOptions = [
     {
       icon: <MessageCircle className="w-6 h-6" />,
       title: 'Telegram Chat',
-      description: `@${appSettings?.telegramId ?? 'zorokun142'}`,
+      description: hasTelegramContact
+        ? `@${normalizedTelegramId}`
+        : 'Support will update soon after we reach 4k family.',
       colorClass: 'bg-valentine-warm-dark/10 text-valentine-warm-dark',
-      link: (() => {
-        const idRaw = (appSettings?.telegramId ?? 'zorokun142').trim();
-        const id = idRaw.startsWith('@') ? idRaw.slice(1) : idRaw;
-        return `https://t.me/${id}`;
-      })(),
+      link: hasTelegramContact ? `https://t.me/${normalizedTelegramId}` : '',
+      isAvailable: hasTelegramContact,
     },
   ];
 
@@ -119,10 +122,16 @@ const HelpSupport: React.FC = () => {
             {contactOptions.map((option, index) => (
               <a
                 key={option.title}
-                href={option.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block bg-card rounded-2xl border border-border p-4 hover:shadow-valentine transition-all duration-300"
+                href={option.isAvailable ? option.link : undefined}
+                target={option.isAvailable ? '_blank' : undefined}
+                rel={option.isAvailable ? 'noopener noreferrer' : undefined}
+                onClick={(e) => {
+                  if (!option.isAvailable) e.preventDefault();
+                }}
+                className={cn(
+                  "block bg-card rounded-2xl border border-border p-4 transition-all duration-300",
+                  option.isAvailable ? "hover:shadow-valentine" : "opacity-70 cursor-not-allowed"
+                )}
                 style={{ animationDelay: `${index * 0.1}s` }}
               >
                 <div className="flex items-center gap-4">
@@ -136,7 +145,7 @@ const HelpSupport: React.FC = () => {
                     <h3 className="font-semibold">{option.title}</h3>
                     <p className="text-sm text-muted-foreground">{option.description}</p>
                   </div>
-                  <ExternalLink className="w-5 h-5 text-muted-foreground" />
+                  <ExternalLink className={cn("w-5 h-5", option.isAvailable ? "text-muted-foreground" : "text-muted-foreground/50")} />
                 </div>
               </a>
             ))}

@@ -13,6 +13,7 @@ import { AdminOrdersTab } from './tabs/AdminOrdersTab';
 import { AdminPacksTab } from './tabs/AdminPacksTab';
 import { AdminAmountTab } from './tabs/AdminAmountTab';
 import { AdminContactTab } from './tabs/AdminContactTab';
+import { AdminQrMethodsTab } from './tabs/AdminQrMethodsTab';
 import { AdminRedeemTab } from './tabs/AdminRedeemTab';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -111,6 +112,7 @@ const AdminPanel: React.FC = () => {
             <TabsTrigger value="packs">Pack Controls</TabsTrigger>
             <TabsTrigger value="amount">AMOUNT</TabsTrigger>
             <TabsTrigger value="contact">Contact</TabsTrigger>
+            <TabsTrigger value="qr-methods">Qr and methods</TabsTrigger>
             <TabsTrigger value="redeem">Redeem</TabsTrigger>
           </TabsList>
 
@@ -137,6 +139,9 @@ const AdminPanel: React.FC = () => {
           </TabsContent>
           <TabsContent value="contact" className="mt-6">
             <AdminContactTab key={`c-${refreshKey}`} onChanged={refresh} />
+          </TabsContent>
+          <TabsContent value="qr-methods" className="mt-6">
+            <AdminQrMethodsTab key={`qm-${refreshKey}`} onChanged={refresh} />
           </TabsContent>
           <TabsContent value="redeem" className="mt-6">
             <AdminRedeemTab key={`rd-${refreshKey}`} onChanged={refresh} />
