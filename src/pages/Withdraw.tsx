@@ -32,6 +32,7 @@ const Withdraw: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'upi' | 'bank'>('upi');
   const [upiId, setUpiId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitLockRef = React.useRef(false);
   const [bankDetails, setBankDetails] = useState({
     accountNumber: '',
     ifscCode: '',
@@ -56,8 +57,6 @@ const Withdraw: React.FC = () => {
       navigate('/login');
     }
   }, [isAuthenticated, navigate]);
-
-  if (!user) return null;
 
   const parsedAmount = parseFloat(amount) || 0;
   const taxAmount = parsedAmount * TAX_RATE;
@@ -97,7 +96,11 @@ const Withdraw: React.FC = () => {
   const endMin = parseHHMM(timeWindow.end);
   const isWithinWithdrawHours = startMin < endMin ? istNowMinutes >= startMin && istNowMinutes <= endMin : true;
 
+  if (!user) return null;
+
   const handleSubmit = async () => {
+    if (submitLockRef.current || isSubmitting) return;
+    submitLockRef.current = true;
     setIsSubmitting(true);
     try {
       const details =
@@ -122,8 +125,16 @@ const Withdraw: React.FC = () => {
       setAmount('');
       setUpiId('');
       setBankDetails({ accountNumber: '', ifscCode: '', accountName: '' });
+    } catch (error) {
+      setModal({
+        isOpen: true,
+        title: 'Withdraw Request Failed',
+        message: error instanceof Error ? error.message : 'Unable to submit withdrawal request.',
+        type: 'error',
+      });
     } finally {
       setIsSubmitting(false);
+      submitLockRef.current = false;
     }
   };
 
@@ -301,6 +312,7 @@ const Withdraw: React.FC = () => {
           size="xl"
           className="w-full mb-8"
           onClick={() => {
+            if (submitLockRef.current || isSubmitting) return;
             if (!isWithinWithdrawHours) {
               setModal({
                 isOpen: true,

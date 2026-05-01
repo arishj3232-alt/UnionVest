@@ -73,6 +73,22 @@ export interface AdminUserMetricsRow {
   withdraw_count: number;
 }
 
+type AdminUserMetricsRpcRow = {
+  user_id: string | null;
+  nickname: string | null;
+  phone: string | null;
+  disabled_at: string | null;
+  balance: number | string | null;
+  total_recharge: number | string | null;
+  total_withdrawal: number | string | null;
+  total_investment: number | string | null;
+  total_earned: number | string | null;
+  total_revenue: number | string | null;
+  total_packs: number | string | null;
+  deposit_count: number | string | null;
+  withdraw_count: number | string | null;
+};
+
 export async function fetchAllRechargeRequests(): Promise<AdminRechargeRequest[]> {
   return safeAsync({ scope: 'fetchAllRechargeRequests' }, async () => {
     const { data, error } = await supabase
@@ -97,7 +113,7 @@ export async function fetchAdminUserMetrics(): Promise<AdminUserMetricsRow[]> {
   return safeAsync({ scope: 'fetchAdminUserMetrics' }, async () => {
     const { data, error } = await supabase.rpc('admin_user_metrics');
     if (error) throw error;
-    return (data ?? []).map((r: any) => ({
+    return ((data ?? []) as AdminUserMetricsRpcRow[]).map((r) => ({
       user_id: String(r.user_id),
       nickname: String(r.nickname ?? ''),
       phone: String(r.phone ?? ''),
@@ -217,7 +233,19 @@ export const adminApproveRecharge = (request_id: string, action: 'approve' | 're
   });
 
 export const adminUpdateBalance = (target_user_id: string, delta: number, reason: string) =>
-  invokeAdmin('admin-update-balance', { target_user_id, delta, reason });
+  safeAsync({ scope: 'adminUpdateBalance', meta: { target_user_id, delta } }, async () => {
+    const { data: auth } = await supabase.auth.getUser();
+    const adminId = auth.user?.id;
+    if (!adminId) throw new Error('Unauthorized');
+    const { data, error } = await supabase.rpc('admin_adjust_user_balance', {
+      p_admin_id: adminId,
+      p_target_user_id: target_user_id,
+      p_delta: delta,
+      p_reason: reason,
+    });
+    if (error) throw error;
+    return data;
+  });
 
 export const adminDisableUser = (target_user_id: string, disabled: boolean, reason: string) =>
   invokeAdmin('admin-disable-user', { target_user_id, disabled, reason });

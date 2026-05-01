@@ -21,8 +21,6 @@ Object.defineProperty(window, "matchMedia", {
 });
 
 // Stub env for supabase client
-(import.meta as any).env = {
-  ...(import.meta as any).env,
-  VITE_SUPABASE_URL: "https://test.supabase.co",
-  VITE_SUPABASE_PUBLISHABLE_KEY: "test-anon-key",
-};
+const testEnv = import.meta.env as Record<string, string | undefined>;
+testEnv.VITE_SUPABASE_URL = "https://test.supabase.co";
+testEnv.VITE_SUPABASE_PUBLISHABLE_KEY = "test-anon-key";

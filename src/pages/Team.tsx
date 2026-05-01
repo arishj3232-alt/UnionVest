@@ -13,10 +13,11 @@ const Team: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const [copied, setCopied] = useState(false);
+  const invitationCode = user?.invitationCode ?? null;
 
   const { data: referrals, isLoading } = useAsyncResource<ReferralRow[]>(
-    useCallback(() => fetchReferralTree(user!.invitationCode), [user?.invitationCode]),
-    { key: user ? `referrals:${user.invitationCode}` : null }
+    useCallback(() => fetchReferralTree(invitationCode!), [invitationCode]),
+    { key: invitationCode ? `referrals:${invitationCode}` : null }
   );
   const referralRows = referrals ?? [];
   const statStyles = {

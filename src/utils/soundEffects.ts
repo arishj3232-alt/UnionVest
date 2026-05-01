@@ -7,7 +7,15 @@ class SoundEffects {
 
   private getContext(): AudioContext {
     if (!this.audioContext) {
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      type AudioWindow = Window & {
+        webkitAudioContext?: typeof AudioContext;
+      };
+      const audioWindow = window as AudioWindow;
+      const AudioCtor = audioWindow.AudioContext ?? audioWindow.webkitAudioContext;
+      if (!AudioCtor) {
+        throw new Error('Web Audio API not supported in this browser');
+      }
+      this.audioContext = new AudioCtor();
     }
     return this.audioContext;
   }

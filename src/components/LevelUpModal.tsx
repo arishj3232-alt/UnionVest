@@ -40,7 +40,7 @@ const LevelUpModal: React.FC<LevelUpModalProps> = ({
     return () => {
       timers.forEach(window.clearTimeout);
     };
-  }, [isOpen, unlockedPacks.length]);
+  }, [isOpen, unlockedPacks]);
 
   if (!isOpen) return null;
 

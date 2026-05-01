@@ -26,6 +26,26 @@ type WithdrawRow = {
   profiles?: { nickname: string; phone: string } | null;
 };
 
+type RawWithdrawRequest = {
+  id: string;
+  user_id: string;
+  amount: number | string;
+  tax_amount: number | string;
+  net_amount: number | string;
+  method: 'upi' | 'bank';
+  details: Record<string, unknown>;
+  status: WithdrawStatus;
+  admin_notes: string | null;
+  created_at: string;
+  processed_at: string | null;
+};
+
+type RawProfile = {
+  user_id: string;
+  nickname: string;
+  phone: string;
+};
+
 async function fetchAllWithdrawRequests(): Promise<WithdrawRow[]> {
   const { data, error } = await supabase
     .from('withdraw_requests')
@@ -33,7 +53,7 @@ async function fetchAllWithdrawRequests(): Promise<WithdrawRow[]> {
     .order('created_at', { ascending: false })
     .limit(300);
   if (error) throw error;
-  const rows = (data ?? []).map((r: any) => ({
+  const rows = ((data ?? []) as RawWithdrawRequest[]).map((r) => ({
     ...r,
     amount: Number(r.amount),
     tax_amount: Number(r.tax_amount),
@@ -46,7 +66,7 @@ async function fetchAllWithdrawRequests(): Promise<WithdrawRow[]> {
     .from('profiles')
     .select('user_id, nickname, phone')
     .in('user_id', userIds);
-  const map = new Map((profiles ?? []).map((p: any) => [p.user_id, p]));
+  const map = new Map<string, RawProfile>(((profiles ?? []) as RawProfile[]).map((p) => [p.user_id, p]));
   return rows.map((r) => ({ ...r, profiles: map.get(r.user_id) ?? null }));
 }
 
@@ -56,7 +76,10 @@ async function adminProcessWithdraw(requestId: string, action: 'approve' | 'reje
     p_action: action,
     p_admin_notes: notes ?? null,
   });
-  if (error) throw error;
+  if (error) {
+    const detail = [error.message, error.details, error.hint].filter(Boolean).join(' | ');
+    throw new Error(detail || 'Failed to process withdraw request.');
+  }
 }
 
 export const AdminWithdrawTab: React.FC<{ onChanged?: () => void }> = ({ onChanged }) => {

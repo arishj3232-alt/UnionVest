@@ -22,8 +22,10 @@ export type PaymentDetails = {
  */
 export const paymentDetails: PaymentDetails = {
   upi: {
-    vpa: "rizwanop111-1@okhdfcbank",
-    payeeName: "Rizwan",
+    // UPI ID is now driven from admin-controlled app settings (upi_vpa).
+    // Keep this empty to avoid stale fallback values flashing in UI/UPI intents.
+    vpa: "",
+    payeeName: "UnionVest",
   },
   bank: {
     accountName: "YOUR_ACCOUNT_NAME",

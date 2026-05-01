@@ -19,6 +19,21 @@ export interface WithdrawRequestRow {
   processed_at: string | null;
 }
 
+type RawWithdrawRequestRow = {
+  id: string;
+  user_id: string;
+  amount: number | string;
+  tax_rate: number | string;
+  tax_amount: number | string;
+  net_amount: number | string;
+  method: WithdrawMethod;
+  details: Record<string, unknown>;
+  status: WithdrawStatus;
+  admin_notes: string | null;
+  created_at: string;
+  processed_at: string | null;
+};
+
 export async function createWithdrawRequest(params: {
   amount: number;
   method: WithdrawMethod;
@@ -46,7 +61,7 @@ export async function fetchWithdrawHistory(userId: string): Promise<WithdrawRequ
       .order('created_at', { ascending: false })
       .limit(200);
     if (error) throw error;
-    return (data ?? []).map((r: any) => ({
+    return ((data ?? []) as RawWithdrawRequestRow[]).map((r) => ({
       ...r,
       amount: Number(r.amount),
       tax_rate: Number(r.tax_rate),

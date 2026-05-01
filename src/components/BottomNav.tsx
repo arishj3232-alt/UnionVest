@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, CreditCard, Package, Users, User } from 'lucide-react';
+import { Home, CreditCard, Package, Users, User, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -14,6 +14,7 @@ const navItems: NavItem[] = [
   { icon: <CreditCard className="w-5 h-5" />, label: 'Recharge', path: '/recharge' },
   { icon: <Package className="w-5 h-5" />, label: 'My Orders', path: '/orders' },
   { icon: <Users className="w-5 h-5" />, label: 'Team', path: '/team' },
+  { icon: <History className="w-5 h-5" />, label: 'Wallet', path: '/wallet-history' },
   { icon: <User className="w-5 h-5" />, label: 'Profile', path: '/profile' },
 ];
 

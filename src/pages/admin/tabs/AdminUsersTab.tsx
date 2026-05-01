@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
@@ -157,6 +157,9 @@ export const AdminUsersTab: React.FC<Props> = ({ onChanged }) => {
               {action === 'role' && `Manage role — ${target?.nickname}`}
               {action === 'disable' && `${target?.disabled_at ? 'Enable' : 'Disable'} — ${target?.nickname}`}
             </DialogTitle>
+            <DialogDescription>
+              Provide a clear reason for audit logs before confirming this admin action.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             {action === 'balance' && (

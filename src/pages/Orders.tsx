@@ -9,8 +9,10 @@ import { Progress } from '@/components/ui/progress';
 import { fetchUserOrders, type OrderRow } from '@/services/ordersService';
 import { useAsyncResource } from '@/hooks/useAsyncResource';
 import { useCallback } from 'react';
+import { getAllPacks } from '@/data/packs';
 
 type Order = OrderRow;
+const PACK_NAME_BY_ID = new Map(getAllPacks().map((p) => [p.id, p.name]));
 
 const Orders: React.FC = () => {
   const navigate = useNavigate();
@@ -133,6 +135,13 @@ interface OrderCardProps {
 
 const OrderCard: React.FC<OrderCardProps> = ({ order, index, completed }) => {
   const progress = (Number(order.earned_amount) / Number(order.max_revenue)) * 100;
+  const displayPackName = PACK_NAME_BY_ID.get(order.pack_id) ?? order.pack_name;
+  const categoryLabel =
+    order.pack_category === 'silver'
+      ? 'Worker Plan'
+      : order.pack_category === 'gold'
+        ? 'Leadership Plan'
+        : 'Activity Plan';
   
   return (
     <div 
@@ -146,14 +155,15 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, index, completed }) => {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span className="text-xl text-primary">{order.pack_category === 'silver' ? '⚙' : '⚒'}</span>
-          <div>
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-semibold text-foreground">{displayPackName}</p>
             <span className={cn(
               "text-xs font-semibold px-2 py-0.5 rounded-full",
               order.pack_category === 'silver' 
                 ? "bg-valentine-warm/20 text-valentine-warm-dark"
                 : "bg-valentine-rose/10 text-valentine-rose"
             )}>
-              {order.pack_category === 'silver' ? 'Starter' : 'Premium'} Level {order.pack_level}
+              {categoryLabel} - Level {order.pack_level}
             </span>
           </div>
         </div>

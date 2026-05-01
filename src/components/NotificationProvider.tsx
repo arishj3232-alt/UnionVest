@@ -21,6 +21,11 @@ export const useNotifications = () => {
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [christmasWishShown, setChristmasWishShown] = useState(false);
   const hasStartedWishCheckRef = useRef(false);
+  const christmasWishShownRef = useRef(false);
+
+  useEffect(() => {
+    christmasWishShownRef.current = christmasWishShown;
+  }, [christmasWishShown]);
 
   // Check for Christmas wish on component mount and every minute
   useEffect(() => {
@@ -36,7 +41,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         now.getFullYear() === 2025 &&
         now.getMonth() === 11 && // December is month 11
         now.getDate() === 25 &&
-        !christmasWishShown &&
+        !christmasWishShownRef.current &&
         !localStorage.getItem('christmas2025WishShown')
       ) {
         showChristmasWish();

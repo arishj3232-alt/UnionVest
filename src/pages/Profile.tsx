@@ -30,6 +30,7 @@ const Profile: React.FC = () => {
 
   if (!user) return null;
 
+
   const maskedPhone = user.phone.replace(/(\d{2})(\d{4})(\d{4})/, '$1******$3');
 
   const copyInviteCode = () => {

@@ -326,6 +326,42 @@ export type Database = {
         }
         Relationships: []
       }
+      wallet_history: {
+        Row: {
+          balance_after: number
+          balance_before: number
+          changed_by: string | null
+          created_at: string
+          delta: number
+          id: string
+          note: string | null
+          source: string
+          user_id: string
+        }
+        Insert: {
+          balance_after: number
+          balance_before: number
+          changed_by?: string | null
+          created_at?: string
+          delta: number
+          id?: string
+          note?: string | null
+          source?: string
+          user_id: string
+        }
+        Update: {
+          balance_after?: number
+          balance_before?: number
+          changed_by?: string | null
+          created_at?: string
+          delta?: number
+          id?: string
+          note?: string | null
+          source?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           granted_at: string

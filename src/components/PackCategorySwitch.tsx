@@ -9,6 +9,9 @@ interface PackCategorySwitchProps {
   onChange: (category: PackCategory) => void;
   userLevel?: number;
   previousLevel?: number;
+  activityLocked?: boolean;
+  activityDescription?: string;
+  activityCountdownBadge?: string;
 }
 
 const categories = [
@@ -43,7 +46,10 @@ const PackCategorySwitch: React.FC<PackCategorySwitchProps> = ({
   activeCategory, 
   onChange, 
   userLevel = 0,
-  previousLevel = 0 
+  previousLevel = 0,
+  activityLocked = true,
+  activityDescription,
+  activityCountdownBadge
 }) => {
   void userLevel;
   void previousLevel;
@@ -53,8 +59,10 @@ const PackCategorySwitch: React.FC<PackCategorySwitchProps> = ({
       <div className="grid grid-cols-3 gap-2 p-2 bg-card rounded-md shadow-card border border-border">
         {categories.map((category, index) => {
           const isActive = activeCategory === category.id;
-          const isLocked = category.locked;
+          const isLocked = category.id === 'activity' ? activityLocked : Boolean(category.locked);
           const Icon = category.Icon;
+          const description = category.id === 'activity' && activityDescription ? activityDescription : category.description;
+          const countdownBadge = category.id === 'activity' ? activityCountdownBadge : undefined;
           
           return (
             <button
@@ -86,16 +94,23 @@ const PackCategorySwitch: React.FC<PackCategorySwitchProps> = ({
               </span>
               
               {isLocked ? (
-                <span className="flex items-center gap-1 mt-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
-                  <Lock className="w-2.5 h-2.5" />
-                  Coming Soon
-                </span>
+                <div className="mt-1 flex flex-col items-center gap-1">
+                  <span className="flex items-center gap-1 text-[9px] font-bold tracking-wide text-muted-foreground">
+                    <Lock className="w-2.5 h-2.5" />
+                    {description}
+                  </span>
+                  {countdownBadge ? (
+                    <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-primary">
+                      {countdownBadge}
+                    </span>
+                  ) : null}
+                </div>
               ) : (
                 <span className={cn(
                   "text-[10px] mt-0.5",
                   isActive ? `${category.activeText} opacity-70` : "text-muted-foreground"
                 )}>
-                  {category.description}
+                  {description}
                 </span>
               )}
             </button>

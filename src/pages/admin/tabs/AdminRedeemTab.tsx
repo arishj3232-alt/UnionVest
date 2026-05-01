@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -25,7 +25,7 @@ export const AdminRedeemTab: React.FC<{ onChanged?: () => void }> = ({ onChanged
     maxClaims: "100",
   });
 
-  const loadCodes = async () => {
+  const loadCodes = useCallback(async () => {
     setIsLoading(true);
     try {
       const rows = await adminListRedeemCodes();
@@ -41,11 +41,11 @@ export const AdminRedeemTab: React.FC<{ onChanged?: () => void }> = ({ onChanged
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     void loadCodes();
-  }, []);
+  }, [loadCodes]);
 
   const onCreate = async () => {
     if (!form.code.trim()) {

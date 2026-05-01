@@ -44,9 +44,11 @@ export async function fetchProfileByUserId(userId: string): Promise<User | null>
     .from('profiles')
     .select('*')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
   if (error || !data) {
-    if (error) console.error('fetchProfileByUserId error:', error);
+    if (error && error.code !== 'PGRST116') {
+      console.error('fetchProfileByUserId error:', error);
+    }
     return null;
   }
   return mapProfile(data);

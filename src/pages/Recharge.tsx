@@ -7,7 +7,7 @@ import BottomNav from '@/components/BottomNav';
 import RosePetals from '@/components/RosePetals';
 import Modal from '@/components/Modal';
 import { cn } from '@/lib/utils';
-import { goldPacks, silverPacks } from '@/data/packs';
+import { activityPacks, goldPacks, silverPacks } from '@/data/packs';
 import { Input } from '@/components/ui/input';
 import { paymentDetails } from '@/config/paymentDetails';
 import QRCode from 'react-qr-code';
@@ -21,6 +21,7 @@ import { useAsyncResource } from '@/hooks/useAsyncResource';
 import { useToast } from '@/hooks/use-toast';
 import { buildUpiPayUri, getDirectPayAppOptions, makeUpiNote, type UpiApp } from '@/utils/upiUri';
 import { fetchPublicAppSettings } from '@/services/appSettingsService';
+import { MAY_2_2026_NOON_IST_MS, getCountdownParts } from '@/utils/releaseGate';
 
 const workerPlanOptions = silverPacks.map((pack) => ({
   id: pack.id,
@@ -38,45 +39,11 @@ const leadershipPlanOptions = goldPacks.map((pack) => ({
   price: pack.price,
 }));
 
-// International Workers' Day countdown target: 01/05/2026
-const VALENTINE_FUND_TARGET = new Date('2026-05-01T00:00:00').getTime();
 const UPI_SCAN_LIMIT = 2000;
 const DIRECT_PAY_SPLIT_LIMIT = 5000;
 const UPI_MAX_TOTAL = 9500;
 const PAYMENT_PROOF_MAX_MB = 30;
 const PAYMENT_PROOF_MAX_BYTES = PAYMENT_PROOF_MAX_MB * 1024 * 1024;
-
-const useCountdown = (targetDate: number) => {
-  const [timeLeft, setTimeLeft] = useState({
-    days: 0,
-    hours: 0,
-    minutes: 0,
-    seconds: 0,
-  });
-
-  useEffect(() => {
-    const calculateTimeLeft = () => {
-      const now = new Date().getTime();
-      const difference = targetDate - now;
-
-      if (difference > 0) {
-        setTimeLeft({
-          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-          hours: Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
-          minutes: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
-          seconds: Math.floor((difference % (1000 * 60)) / 1000),
-        });
-      }
-    };
-
-    calculateTimeLeft();
-    const timer = setInterval(calculateTimeLeft, 1000);
-
-    return () => clearInterval(timer);
-  }, [targetDate]);
-
-  return timeLeft;
-};
 
 const Recharge: React.FC = () => {
   const navigate = useNavigate();
@@ -91,6 +58,7 @@ const Recharge: React.FC = () => {
   const [showDirectPayFallback, setShowDirectPayFallback] = useState(false);
   const [lastDirectPayApp, setLastDirectPayApp] = useState<UpiApp | null>(null);
   const [appSettingsRefreshTick, setAppSettingsRefreshTick] = useState(0);
+  const [releaseNowMs, setReleaseNowMs] = useState(() => Date.now());
   // Local prepend buffer for newly-submitted requests so the UI updates
   // without re-fetching the full history.
   const [historyOverrides, setHistoryOverrides] = useState<RechargeTransaction[]>([]);
@@ -101,7 +69,9 @@ const Recharge: React.FC = () => {
     type: 'info'
   });
 
-  const countdown = useCountdown(VALENTINE_FUND_TARGET);
+  const solidarityPack = activityPacks[0];
+  const solidarityLocked = releaseNowMs < MAY_2_2026_NOON_IST_MS;
+  const countdown = getCountdownParts(MAY_2_2026_NOON_IST_MS - releaseNowMs);
   const selectedWorker = workerPlanOptions.find(p => p.id === selectedWorkerPlan);
   const selectedLeadership = leadershipPlanOptions.find(p => p.id === selectedLeadershipPlan);
   const amount = (selectedWorker?.price ?? 0) + (selectedLeadership?.price ?? 0);
@@ -356,6 +326,11 @@ const Recharge: React.FC = () => {
   }, [isAuthenticated, navigate]);
 
   useEffect(() => {
+    const timer = window.setInterval(() => setReleaseNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     if (!selectedWorker || !selectedLeadership) {
       setHasShownMismatchToast(false);
       return;
@@ -602,30 +577,63 @@ const Recharge: React.FC = () => {
       </header>
 
       <main className="px-4 py-6 max-w-lg mx-auto relative z-10">
-        {/* Solidarity Fund Timer */}
-        <div className="mb-6 bg-primary rounded-md p-4 animate-fade-in border-l-4 border-foreground">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <Timer className="w-5 h-5 text-primary-foreground" />
-            <h3 className="font-bold text-primary-foreground uppercase tracking-wider">Solidarity Fund · May 1, 2026</h3>
-          </div>
-          <div className="grid grid-cols-4 gap-2 text-center">
-            <div className="bg-card/20 backdrop-blur rounded-xl p-2">
-              <p className="text-2xl font-bold text-valentine-blush-light">{countdown.days}</p>
-              <p className="text-xs text-primary-foreground/70">Days</p>
+        {/* Solidarity Fund Release */}
+        <div className="mb-6 animate-fade-in">
+          {solidarityLocked ? (
+            <div className="rounded-2xl border border-primary/30 bg-gradient-to-r from-primary to-primary/80 p-4 shadow-lg shadow-primary/20">
+              <div className="flex items-center justify-center gap-2 mb-3">
+                <Timer className="w-5 h-5 text-primary-foreground" />
+                <h3 className="font-bold text-primary-foreground uppercase tracking-wider">Solidarity Fund · May 2, 12:00 PM IST</h3>
+              </div>
+              <div className="grid grid-cols-4 gap-2 text-center">
+                <div className="rounded-xl border border-white/20 bg-white/10 p-2">
+                  <p className="text-2xl font-bold text-primary-foreground">{countdown.days}</p>
+                  <p className="text-xs text-primary-foreground/80">Days</p>
+                </div>
+                <div className="rounded-xl border border-white/20 bg-white/10 p-2">
+                  <p className="text-2xl font-bold text-primary-foreground">{countdown.hours}</p>
+                  <p className="text-xs text-primary-foreground/80">Hours</p>
+                </div>
+                <div className="rounded-xl border border-white/20 bg-white/10 p-2">
+                  <p className="text-2xl font-bold text-primary-foreground">{countdown.minutes}</p>
+                  <p className="text-xs text-primary-foreground/80">Minutes</p>
+                </div>
+                <div className="rounded-xl border border-white/20 bg-white/10 p-2">
+                  <p className="text-2xl font-bold text-primary-foreground">{countdown.seconds}</p>
+                  <p className="text-xs text-primary-foreground/80">Seconds</p>
+                </div>
+              </div>
             </div>
-            <div className="bg-card/20 backdrop-blur rounded-xl p-2">
-              <p className="text-2xl font-bold text-valentine-blush-light">{countdown.hours}</p>
-              <p className="text-xs text-primary-foreground/70">Hours</p>
+          ) : (
+            <div className="rounded-2xl border border-amber-400/40 bg-gradient-to-r from-amber-500/15 via-yellow-500/15 to-orange-500/15 p-4 shadow-lg shadow-amber-500/15">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="inline-flex items-center gap-1 rounded-full border border-amber-300/50 bg-amber-400/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200">
+                    <Sparkles className="w-3 h-3" />
+                    Live Now
+                  </p>
+                  <h3 className="mt-2 text-lg font-bold uppercase tracking-wide text-foreground">
+                    Solidarity Pack
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {solidarityPack?.name ?? 'Solidarity Fund'} is now available with premium returns.
+                  </p>
+                </div>
+                <div className="rounded-xl border border-amber-400/40 bg-background/70 px-3 py-2 text-right">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Entry</p>
+                  <p className="text-sm font-semibold text-foreground">₹{(solidarityPack?.price ?? 1300).toLocaleString('en-IN')}</p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-3 w-full border-amber-400/50 bg-amber-400/10 hover:bg-amber-400/20"
+                onClick={() => navigate('/dashboard')}
+              >
+                View Solidarity Pack
+              </Button>
             </div>
-            <div className="bg-card/20 backdrop-blur rounded-xl p-2">
-              <p className="text-2xl font-bold text-valentine-blush-light">{countdown.minutes}</p>
-              <p className="text-xs text-primary-foreground/70">Minutes</p>
-            </div>
-            <div className="bg-card/20 backdrop-blur rounded-xl p-2">
-              <p className="text-2xl font-bold text-valentine-blush-light">{countdown.seconds}</p>
-              <p className="text-xs text-primary-foreground/70">Seconds</p>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Worker Plan Selection */}
@@ -833,7 +841,7 @@ const Recharge: React.FC = () => {
 
             {!effectiveUpiVpa ? (
               <div className="text-sm text-destructive">
-                Missing UPI ID. Set `paymentDetails.upi.vpa` in `src/config/paymentDetails.ts`.
+                Missing UPI ID. Set UPI ID in Admin → QR and Methods.
               </div>
             ) : (
               <div className="space-y-4">

@@ -24,6 +24,7 @@ import { triggerValentineConfetti } from '@/utils/confetti';
 import { getNewlyUnlockedPacks } from '@/utils/packUnlocks';
 import { playSuccess, playError, playCoin } from '@/utils/soundEffects';
 import { fetchPackControls } from '@/services/adminService';
+import { MAY_2_2026_NOON_IST_MS, formatCountdown, getCountdownParts } from '@/utils/releaseGate';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -34,10 +35,16 @@ const Dashboard: React.FC = () => {
   const [levelUpModal, setLevelUpModal] = useState<{ isOpen: boolean; newLevel: number; unlockedPacks: VIPPack[] }>({ isOpen: false, newLevel: 0, unlockedPacks: [] });
   const [isProcessing, setIsProcessing] = useState(false);
   const [levelOverride, setLevelOverride] = useState<number | null>(null);
+  const [releaseNowMs, setReleaseNowMs] = useState(() => Date.now());
 
   useEffect(() => {
     if (!isAuthenticated) navigate('/login');
   }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    const t = window.setInterval(() => setReleaseNowMs(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, []);
 
   // Single, deduped, StrictMode-safe fetch of the user's highest silver
   // pack level. Module-level cache in useAsyncResource ensures the same
@@ -132,7 +139,20 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  const packs = applyPackControls(getPacksByCategory(activeCategory), packControls ?? []);
+  const solidarityLocked = releaseNowMs < MAY_2_2026_NOON_IST_MS;
+  const solidarityCountdown = formatCountdown(MAY_2_2026_NOON_IST_MS - releaseNowMs);
+  const solidarityCountdownParts = getCountdownParts(MAY_2_2026_NOON_IST_MS - releaseNowMs);
+  const solidarityCountdownBadge = [
+    `${String(solidarityCountdownParts.days).padStart(2, '0')}D`,
+    `${String(solidarityCountdownParts.hours).padStart(2, '0')}H`,
+    `${String(solidarityCountdownParts.minutes).padStart(2, '0')}M`,
+    `${String(solidarityCountdownParts.seconds).padStart(2, '0')}S`,
+  ].join(' : ');
+  const packs = applyPackControls(getPacksByCategory(activeCategory), packControls ?? []).map((pack) => {
+    if (pack.category !== 'activity') return pack;
+    if (solidarityLocked) return { ...pack, isLocked: true };
+    return { ...pack, isLocked: Boolean(pack.isPaused) };
+  });
 
   return (
     <div className="min-h-screen bg-background pb-24 relative">
@@ -167,7 +187,15 @@ const Dashboard: React.FC = () => {
             <Wrench className="w-5 h-5 text-primary" />
             Worker Plans
           </h2>
-          <PackCategorySwitch activeCategory={activeCategory} onChange={setActiveCategory} userLevel={userHighestSilverLevel} previousLevel={0} />
+          <PackCategorySwitch
+            activeCategory={activeCategory}
+            onChange={setActiveCategory}
+            userLevel={userHighestSilverLevel}
+            previousLevel={0}
+            activityLocked={solidarityLocked}
+            activityDescription={solidarityLocked ? 'Opens Soon' : 'Now Live'}
+            activityCountdownBadge={solidarityLocked ? solidarityCountdownBadge : undefined}
+          />
         </div>
 
         {activeCategory === 'silver' && (
@@ -177,12 +205,17 @@ const Dashboard: React.FC = () => {
         )}
 
         <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4">
-          {activeCategory === 'activity' ? (
+          {activeCategory === 'activity' && solidarityLocked ? (
             <ScrollReveal variant="valentine">
               <div className="text-center py-12 bg-muted/50 rounded-md border border-border">
                 <Wrench className="w-12 h-12 text-primary mx-auto mb-4" strokeWidth={2.5} />
                 <h3 className="font-display text-xl font-bold text-foreground uppercase tracking-wider">Coming Soon</h3>
-                <p className="text-muted-foreground text-sm mt-2">Solidarity Fund opens May 1st.</p>
+                <p className="text-muted-foreground text-sm mt-2">Solidarity Fund opens May 2, 12:00 PM IST.</p>
+                <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1">
+                  <span className="text-[10px] uppercase tracking-wider text-primary/80">Launch In</span>
+                  <span className="text-xs font-semibold text-primary">{solidarityCountdownBadge}</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2">{solidarityCountdown}</p>
               </div>
             </ScrollReveal>
           ) : (

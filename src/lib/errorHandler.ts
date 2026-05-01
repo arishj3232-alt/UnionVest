@@ -48,7 +48,6 @@ export function toMessage(err: unknown, fallback = 'Something went wrong.'): str
  * (Sentry, Datadog, etc.) without touching call sites.
  */
 export function reportError(err: unknown, ctx: ErrorContext): void {
-  // eslint-disable-next-line no-console
   console.error(`[${ctx.scope}]`, toMessage(err), ctx.meta ?? '');
 }
 

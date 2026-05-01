@@ -21,6 +21,7 @@ import Team from "./pages/Team";
 import PaymentMethods from "./pages/PaymentMethods";
 import Security from "./pages/Security";
 import HelpSupport from "./pages/HelpSupport";
+import WalletHistory from "./pages/WalletHistory";
 import NotFound from "./pages/NotFound";
 import AdminPanel from "./pages/admin/AdminPanel";
 
@@ -49,6 +50,7 @@ const App = () => (
                 <Route path="/payments" element={<PaymentMethods />} />
                 <Route path="/security" element={<Security />} />
                 <Route path="/help" element={<HelpSupport />} />
+                <Route path="/wallet-history" element={<WalletHistory />} />
                 <Route path="/admin" element={<AdminPanel />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />

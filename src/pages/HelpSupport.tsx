@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, MessageCircle, ChevronDown, ChevronUp, ExternalLink, Lock } from 'lucide-react';
+import { ArrowLeft, MessageCircle, ChevronDown, ChevronUp, ExternalLink, Lock, Clock3, CircleCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import BottomNav from '@/components/BottomNav';
@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { useAsyncResource } from '@/hooks/useAsyncResource';
 import { fetchPublicAppSettings } from '@/services/appSettingsService';
 import { fetchHighestSilverLevel } from '@/services/ordersService';
+import { MAY_2_2026_NOON_IST_MS, formatCountdown, getCountdownParts } from '@/utils/releaseGate';
 
 interface FAQ {
   question: string;
@@ -19,6 +20,7 @@ const HelpSupport: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
+  const [releaseNowMs, setReleaseNowMs] = useState(() => Date.now());
   const { data: appSettings } = useAsyncResource(fetchPublicAppSettings, {
     key: 'help:public-app-settings',
   });
@@ -36,6 +38,11 @@ const HelpSupport: React.FC = () => {
       navigate('/login');
     }
   }, [isAuthenticated, navigate]);
+
+  React.useEffect(() => {
+    const t = window.setInterval(() => setReleaseNowMs(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, []);
 
   const faqs: FAQ[] = [
     {
@@ -62,15 +69,30 @@ const HelpSupport: React.FC = () => {
 
   const telegramIdRaw = (appSettings?.telegramId ?? '').trim();
   const normalizedTelegramId = telegramIdRaw.startsWith('@') ? telegramIdRaw.slice(1) : telegramIdRaw;
-  const hasTelegramContact = normalizedTelegramId.length > 0;
+  const supportReleaseLocked = releaseNowMs < MAY_2_2026_NOON_IST_MS;
+  const supportCountdown = formatCountdown(MAY_2_2026_NOON_IST_MS - releaseNowMs);
+  const supportCountdownParts = getCountdownParts(MAY_2_2026_NOON_IST_MS - releaseNowMs);
+  const supportCountdownBadge = [
+    `${String(supportCountdownParts.days).padStart(2, '0')}D`,
+    `${String(supportCountdownParts.hours).padStart(2, '0')}H`,
+    `${String(supportCountdownParts.minutes).padStart(2, '0')}M`,
+    `${String(supportCountdownParts.seconds).padStart(2, '0')}S`,
+  ].join(' : ');
+  const hasTelegramContact = !supportReleaseLocked && normalizedTelegramId.length > 0;
+  const supportWindowText = 'Mon - Sat, 9:00 AM to 9:00 PM IST';
+  const supportResponseText = supportReleaseLocked
+    ? `Support chat opens May 2, 12:00 PM IST (in ${supportCountdown})`
+    : 'Typical first response: within 2-4 hours';
 
   const contactOptions = [
     {
       icon: <MessageCircle className="w-6 h-6" />,
       title: 'Telegram Chat',
-      description: hasTelegramContact
-        ? `@${normalizedTelegramId}`
-        : 'Support will update soon after we reach 4k family.',
+      description: supportReleaseLocked
+        ? `Opens May 2, 12:00 PM IST • ${supportCountdown}`
+        : hasTelegramContact
+          ? `@${normalizedTelegramId}`
+          : 'Support will update soon after we reach 4k family.',
       colorClass: 'bg-valentine-warm-dark/10 text-valentine-warm-dark',
       link: hasTelegramContact ? `https://t.me/${normalizedTelegramId}` : '',
       isAvailable: hasTelegramContact,
@@ -92,6 +114,26 @@ const HelpSupport: React.FC = () => {
       </header>
 
       <main className="px-4 py-6 max-w-lg mx-auto relative z-10">
+        <div className="mb-4 rounded-xl border border-border bg-card p-4 animate-fade-in">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold">Support Desk Status</p>
+              <p className="text-xs text-muted-foreground mt-1">{supportWindowText}</p>
+            </div>
+            <span className={cn(
+              "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide",
+              hasTelegramContact ? "bg-green-500/10 text-green-600" : "bg-muted text-muted-foreground"
+            )}>
+              <CircleCheck className="w-3 h-3" />
+              {hasTelegramContact ? 'Online' : supportReleaseLocked ? 'Opens Soon' : 'Updating'}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
+            <Clock3 className="w-3 h-3" />
+            {supportResponseText}
+          </p>
+        </div>
+
         {/* Contact Options */}
         <div className="mb-8 animate-fade-in relative">
           <h2 className="font-semibold mb-4">Contact Us</h2>
@@ -105,7 +147,7 @@ const HelpSupport: React.FC = () => {
                 </div>
                 <h3 className="font-semibold mb-2">Contact Support Locked</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Purchase any pack to unlock contact support
+                  Purchase any pack to unlock direct support chat.
                 </p>
                 <Button
                   variant="rose"
@@ -144,12 +186,32 @@ const HelpSupport: React.FC = () => {
                   <div className="flex-1">
                     <h3 className="font-semibold">{option.title}</h3>
                     <p className="text-sm text-muted-foreground">{option.description}</p>
+                    {supportReleaseLocked && option.title === 'Telegram Chat' && (
+                      <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1">
+                        <span className="text-[10px] uppercase tracking-wider text-primary/80">Opens In</span>
+                        <span className="text-[11px] font-semibold text-primary">{supportCountdownBadge}</span>
+                      </div>
+                    )}
+                    {option.isAvailable && (
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        For faster help, share your UID + screenshot in first message.
+                      </p>
+                    )}
                   </div>
                   <ExternalLink className={cn("w-5 h-5", option.isAvailable ? "text-muted-foreground" : "text-muted-foreground/50")} />
                 </div>
               </a>
             ))}
           </div>
+        </div>
+
+        <div className="mb-8 rounded-xl border border-border bg-card p-4 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+          <h3 className="font-semibold text-sm mb-2">Before you contact support</h3>
+          <ul className="space-y-1 text-xs text-muted-foreground">
+            <li>Keep payment screenshot and UPI Ref/Txn ID ready.</li>
+            <li>Mention your registered phone number or UID.</li>
+            <li>Avoid duplicate requests while one is pending review.</li>
+          </ul>
         </div>
 
         {/* FAQs */}
