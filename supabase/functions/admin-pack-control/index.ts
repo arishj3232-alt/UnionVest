@@ -1,3 +1,4 @@
+/// <reference path="../deno.d.ts" />
 import { corsHeaders, jsonResponse, requireAdmin } from "../_shared/adminAuth.ts";
 
 type Action = "pause_pack" | "adjust_earning" | "terminate_order";

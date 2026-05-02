@@ -3,6 +3,7 @@ import { Lock, TrendingUp, Clock, Coins, Calendar, Wrench } from 'lucide-react';
 import { VIPPack } from '@/types';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { MAY_2_2026_NOON_IST_MS, getCountdownParts } from '@/utils/releaseGate';
 import {
   Tooltip,
   TooltipContent,
@@ -40,22 +41,6 @@ const packImages: Record<string, string> = {
   'activity-1': packActivity1,
 };
 
-// Countdown to International Workers' Day (May 1, 2026)
-const getHoliCountdown = () => {
-  const holiDay = new Date('2026-05-01T00:00:00');
-  const now = new Date();
-  const diff = holiDay.getTime() - now.getTime();
-  
-  if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0 };
-  
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-  
-  return { days, hours, minutes, seconds };
-};
-
 interface PackCardProps {
   pack: VIPPack;
   userHighestSilverLevel?: number;
@@ -63,19 +48,19 @@ interface PackCardProps {
 }
 
 const PackCardImpl: React.FC<PackCardProps> = ({ pack, userHighestSilverLevel = 0, onBuy }) => {
-  const [countdown, setCountdown] = useState(getHoliCountdown());
+  const [solidarityGateTick, setSolidarityGateTick] = useState(() => Date.now());
   const isGoldLocked = pack.category === 'gold' && pack.requiredLevel && pack.requiredLevel > userHighestSilverLevel;
-  const isActivityLocked = pack.category === 'activity';
+  const isActivityGateLocked = pack.category === 'activity' && pack.isLocked;
   const isPaused = !!pack.isPaused;
-  const isLocked = isGoldLocked || isActivityLocked || isPaused;
+  const isLocked = isGoldLocked || isPaused || isActivityGateLocked;
 
   useEffect(() => {
-    if (!isActivityLocked) return;
-    const timer = setInterval(() => {
-      setCountdown(getHoliCountdown());
-    }, 1000);
+    if (!isActivityGateLocked) return;
+    const timer = setInterval(() => setSolidarityGateTick(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [isActivityLocked]);
+  }, [isActivityGateLocked]);
+
+  const countdown = getCountdownParts(MAY_2_2026_NOON_IST_MS - solidarityGateTick);
 
   const categoryStyles = {
     silver: {
@@ -160,11 +145,11 @@ const PackCardImpl: React.FC<PackCardProps> = ({ pack, userHighestSilverLevel = 
         </div>
       </div>
 
-      {isActivityLocked && (
+      {isActivityGateLocked && (
         <div className="mb-4 p-3 bg-primary/5 rounded-md border border-primary/30">
           <div className="flex items-center justify-center gap-2 mb-2">
             <Wrench className="w-4 h-4 text-primary" />
-            <span className="text-xs font-bold text-primary uppercase tracking-widest">Labour Day Countdown</span>
+            <span className="text-xs font-bold text-primary uppercase tracking-widest">Solidarity opens</span>
           </div>
           <div className="grid grid-cols-4 gap-2 text-center">
             <div className="bg-card rounded-lg p-2 shadow-sm">
@@ -192,10 +177,10 @@ const PackCardImpl: React.FC<PackCardProps> = ({ pack, userHighestSilverLevel = 
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-card/90 backdrop-blur-[1px] rounded-xl">
             <Lock className="w-5 h-5 text-muted-foreground mb-1" />
           <p className="text-xs text-muted-foreground text-center px-2 font-medium uppercase tracking-wider">
-              {isActivityLocked
-                ? "Unlocks May 1st"
-                : isPaused
+              {isPaused
                 ? "Paused by admin"
+                : isActivityGateLocked
+                ? "Unlocks May 2 · 12:00 PM IST"
                 : `Unlock at Worker Level ${pack.requiredLevel}`
               }
             </p>
@@ -213,7 +198,7 @@ const PackCardImpl: React.FC<PackCardProps> = ({ pack, userHighestSilverLevel = 
     </div>
   );
 
-  if (isActivityLocked) {
+  if (isActivityGateLocked) {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
@@ -227,9 +212,9 @@ const PackCardImpl: React.FC<PackCardProps> = ({ pack, userHighestSilverLevel = 
         >
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4" />
-            <p className="font-bold uppercase tracking-wider">Opens May 1st, 2026</p>
+            <p className="font-bold uppercase tracking-wider">Opens May 2 · 12:00 PM IST</p>
           </div>
-          <p className="text-sm mt-1">The Solidarity Fund opens on International Workers' Day.</p>
+          <p className="text-sm mt-1">The Solidarity Fund unlocks together with Worker Plans scheduling.</p>
         </TooltipContent>
       </Tooltip>
     );

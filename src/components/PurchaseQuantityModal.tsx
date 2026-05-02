@@ -150,7 +150,7 @@ const PurchaseQuantityModal: React.FC<Props> = ({
               className="w-full uppercase tracking-wider"
             >
               {isProcessing
-                ? 'Processing…'
+                ? 'PROCESSING...'
                 : `Confirm · ₹${total.toLocaleString('en-IN')}`}
             </Button>
           )}

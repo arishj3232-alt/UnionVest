@@ -527,6 +527,10 @@ export type Database = {
         Returns: string
       }
       credit_user_earnings: { Args: { p_user_id: string }; Returns: number }
+      pack_earnings_display_total: {
+        Args: { p_user_id: string }
+        Returns: number
+      }
       redeem_code_apply: { Args: { p_code: string }; Returns: number }
       redeem_code_apply_safe: {
         Args: { p_code: string }

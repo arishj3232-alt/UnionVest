@@ -1,3 +1,4 @@
+/// <reference path="../deno.d.ts" />
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -5,8 +6,19 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Pack definitions (must match frontend)
-const packs = [
+// Pack definitions (must match frontend). maxQuantity: cap per purchase (default 50).
+const packs: Array<{
+  id: string;
+  name: string;
+  category: string;
+  level: number;
+  price: number;
+  dailyEarning: number;
+  duration: number;
+  totalRevenue: number;
+  requiredLevel?: number;
+  maxQuantity?: number;
+}> = [
   { id: 'silver-1', name: 'Apprentice Tier', category: 'silver', level: 1, price: 1099, dailyEarning: 560, duration: 28, totalRevenue: 15680 },
   { id: 'silver-2', name: 'Worker Tier', category: 'silver', level: 2, price: 1499, dailyEarning: 700, duration: 28, totalRevenue: 19600 },
   { id: 'silver-3', name: 'Craftsman Tier', category: 'silver', level: 3, price: 2700, dailyEarning: 1000, duration: 28, totalRevenue: 28000 },
@@ -17,6 +29,7 @@ const packs = [
   { id: 'gold-3', name: 'Supervisor Plan', category: 'gold', level: 3, price: 6800, dailyEarning: 7000, duration: 7, totalRevenue: 49000, requiredLevel: 3 },
   { id: 'gold-4', name: 'Director Plan', category: 'gold', level: 4, price: 11500, dailyEarning: 15000, duration: 4, totalRevenue: 60000, requiredLevel: 4 },
   { id: 'gold-5', name: 'Executive Plan', category: 'gold', level: 5, price: 14300, dailyEarning: 20000, duration: 4, totalRevenue: 80000, requiredLevel: 5 },
+  { id: 'activity-1', name: 'Solidarity Fund', category: 'activity', level: 1, price: 1300, dailyEarning: 3000, duration: 1, totalRevenue: 3000, maxQuantity: 1 },
 ];
 
 Deno.serve(async (req: Request) => {
@@ -56,10 +69,15 @@ Deno.serve(async (req: Request) => {
     console.log(`Purchase request from user: ${user.id}`);
 
     // Parse request body
-    const body = await req.json();
+    const body = await req.json() as { pack_id?: unknown; quantity?: unknown } | null | undefined;
     const pack_id = body?.pack_id;
     const quantityRaw = body?.quantity ?? 1;
-    const quantity = Number.isInteger(quantityRaw) ? quantityRaw : parseInt(quantityRaw, 10);
+    const quantity: number =
+      typeof quantityRaw === "number" && Number.isInteger(quantityRaw)
+        ? quantityRaw
+        : typeof quantityRaw === "string"
+          ? parseInt(quantityRaw, 10)
+          : parseInt(String(quantityRaw), 10);
 
     if (!pack_id || typeof pack_id !== "string") {
       return new Response(
@@ -67,20 +85,21 @@ Deno.serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 50) {
-      return new Response(
-        JSON.stringify({ error: "Quantity must be an integer between 1 and 50" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Find pack
+    // Find pack (need per-pack max before quantity check)
     const pack = packs.find(p => p.id === pack_id);
     if (!pack) {
       console.error("Pack not found:", pack_id);
       return new Response(
         JSON.stringify({ error: "Pack not found" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const maxQty = pack.maxQuantity ?? 50;
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > maxQty) {
+      return new Response(
+        JSON.stringify({ error: `Quantity must be an integer between 1 and ${maxQty}` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 

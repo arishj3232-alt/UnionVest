@@ -1,11 +1,13 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { Wallet, TrendingUp, ArrowDownCircle, ArrowUpCircle, Camera, Hammer } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { fetchPackEarningsDisplayTotal } from '@/services/ordersService';
 
 const ParallaxWalletCard: React.FC = () => {
   const { user } = useAuth();
+  const [displayEarnings, setDisplayEarnings] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { scrollY } = useScroll();
   
@@ -15,14 +17,36 @@ const ParallaxWalletCard: React.FC = () => {
   const decorY1 = useTransform(scrollY, [0, 300], [0, -20]);
   const shadowOpacity = useTransform(scrollY, [0, 200], [0.4, 0.2]);
 
+  const authId = user?.authId ?? null;
+
+  useEffect(() => {
+    if (!authId) {
+      setDisplayEarnings(null);
+      return;
+    }
+    let cancelled = false;
+    fetchPackEarningsDisplayTotal(authId)
+      .then((n) => {
+        if (!cancelled) setDisplayEarnings(Number.isFinite(n) ? n : 0);
+      })
+      .catch(() => {
+        if (!cancelled) setDisplayEarnings(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authId, user?.balance, user?.productRevenue]);
+
   if (!user) return null;
   const maskedPhone = user.phone.replace(/(\d{2})(\d{4})(\d{4})/, '$1******$3');
+
+  const earningsShown = displayEarnings ?? user.productRevenue;
 
   const stats = [
     { icon: <Wallet className="w-5 h-5" />, label: 'Balance', value: `₹${user.balance.toLocaleString()}` },
     { icon: <ArrowDownCircle className="w-5 h-5" />, label: 'Deposits', value: `₹${user.totalRecharge.toLocaleString()}` },
     { icon: <ArrowUpCircle className="w-5 h-5" />, label: 'Withdrawn', value: `₹${user.totalWithdrawal.toLocaleString()}` },
-    { icon: <TrendingUp className="w-5 h-5" />, label: 'Earnings', value: `₹${user.productRevenue.toLocaleString()}` },
+    { icon: <TrendingUp className="w-5 h-5" />, label: 'Earnings', value: `₹${earningsShown.toLocaleString()}` },
   ];
 
   return (

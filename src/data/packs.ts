@@ -17,7 +17,18 @@ export const goldPacks: VIPPack[] = [
 ];
 
 export const activityPacks: VIPPack[] = [
-  { id: 'activity-1', name: 'Solidarity Fund', category: 'activity', level: 1, price: 1300, dailyEarning: 3000, duration: 1, totalRevenue: 3000, isLocked: true },
+  {
+    id: 'activity-1',
+    name: 'Solidarity Fund',
+    category: 'activity',
+    level: 1,
+    price: 1300,
+    dailyEarning: 3000,
+    duration: 1,
+    totalRevenue: 3000,
+    isLocked: true,
+    maxQuantity: 1,
+  },
 ];
 
 export const getAllPacks = () => [...silverPacks, ...goldPacks, ...activityPacks];

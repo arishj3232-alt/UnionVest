@@ -89,3 +89,14 @@ export async function creditUserEarnings(userId: string): Promise<number> {
     return Number(data ?? 0);
   });
 }
+
+/** Accrued pack earnings for dashboard display (includes current 24h window before balance credit). */
+export async function fetchPackEarningsDisplayTotal(userId: string): Promise<number> {
+  return safeAsync({ scope: 'fetchPackEarningsDisplayTotal', meta: { userId } }, async () => {
+    const { data, error } = await supabase.rpc('pack_earnings_display_total', {
+      p_user_id: userId,
+    });
+    if (error) throw error;
+    return Number(data ?? 0);
+  });
+}

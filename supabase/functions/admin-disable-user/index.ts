@@ -1,3 +1,4 @@
+/// <reference path="../deno.d.ts" />
 import { requireAdmin, corsHeaders, jsonResponse } from "../_shared/adminAuth.ts";
 
 Deno.serve(async (req: Request) => {
