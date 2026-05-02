@@ -8,12 +8,14 @@ import { safeAsync } from '@/lib/errorHandler';
 
 export interface OrderRow {
   id: string;
+  pack_id: string;
   pack_category: string;
   pack_level: number;
   pack_name: string;
   status: string;
   invested_amount: number;
   earned_amount: number;
+  daily_earning: number;
   max_revenue: number;
   purchased_at: string;
   days_remaining: number;

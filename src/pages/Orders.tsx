@@ -14,6 +14,27 @@ import { getAllPacks } from '@/data/packs';
 type Order = OrderRow;
 const PACK_NAME_BY_ID = new Map(getAllPacks().map((p) => [p.id, p.name]));
 
+const getOrderDisplayEarned = (order: Order): number => {
+  const settled = Number(order.earned_amount ?? 0);
+  const maxRevenue = Number(order.max_revenue ?? 0);
+  const daily = Number(order.daily_earning ?? 0);
+  const purchasedAtMs = new Date(order.purchased_at).getTime();
+
+  if (!Number.isFinite(purchasedAtMs) || maxRevenue <= 0 || daily <= 0) {
+    return settled;
+  }
+
+  const elapsedSeconds = Math.max((Date.now() - purchasedAtMs) / 1000, 0);
+  const accrued =
+    elapsedSeconds < 86400
+      ? daily
+      : (elapsedSeconds / 86400) * daily;
+
+  // Show the same live-accrual model as Dashboard, while never showing
+  // less than already-settled order earnings.
+  return Math.min(maxRevenue, Math.max(settled, accrued));
+};
+
 const Orders: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
@@ -41,8 +62,8 @@ const Orders: React.FC = () => {
   };
   const runningOrders = orders.filter(o => normalizeStatus(o.status) === 'running');
   const completedOrders = orders.filter(o => normalizeStatus(o.status) === 'completed');
-  const settledEarned = orders.reduce((sum, o) => sum + Number(o.earned_amount), 0);
-  const totalEarned = displayEarnings ?? settledEarned;
+  const liveOrdersEarned = orders.reduce((sum, o) => sum + getOrderDisplayEarned(o), 0);
+  const totalEarned = displayEarnings ?? liveOrdersEarned;
 
   return (
     <div className="min-h-screen bg-background pb-24 relative">
@@ -139,7 +160,8 @@ interface OrderCardProps {
 }
 
 const OrderCard: React.FC<OrderCardProps> = ({ order, index, completed }) => {
-  const progress = (Number(order.earned_amount) / Number(order.max_revenue)) * 100;
+  const displayEarned = getOrderDisplayEarned(order);
+  const progress = (displayEarned / Number(order.max_revenue)) * 100;
   const displayPackName = PACK_NAME_BY_ID.get(order.pack_id) ?? order.pack_name;
   const categoryLabel =
     order.pack_category === 'silver'
@@ -190,7 +212,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, index, completed }) => {
         </div>
         <div>
           <p className="text-muted-foreground text-xs">Earned</p>
-          <p className="font-semibold text-valentine-warm-dark">₹{Number(order.earned_amount).toLocaleString()}</p>
+          <p className="font-semibold text-valentine-warm-dark">₹{displayEarned.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
         </div>
         <div>
           <p className="text-muted-foreground text-xs">Max Revenue</p>
