@@ -6,7 +6,7 @@ import BottomNav from '@/components/BottomNav';
 import RosePetals from '@/components/RosePetals';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
-import { fetchUserOrders, type OrderRow } from '@/services/ordersService';
+import { fetchPackEarningsDisplayTotal, fetchUserOrders, type OrderRow } from '@/services/ordersService';
 import { useAsyncResource } from '@/hooks/useAsyncResource';
 import { useCallback } from 'react';
 import { getAllPacks } from '@/data/packs';
@@ -23,6 +23,10 @@ const Orders: React.FC = () => {
     useCallback(() => fetchUserOrders(userId!), [userId]),
     { key: userId ? `orders:${userId}` : null }
   );
+  const { data: displayEarnings } = useAsyncResource<number>(
+    useCallback(() => fetchPackEarningsDisplayTotal(userId!), [userId]),
+    { key: userId ? `orders:display-earnings:${userId}` : null }
+  );
   const orders = ordersData ?? [];
 
   useEffect(() => {
@@ -37,7 +41,8 @@ const Orders: React.FC = () => {
   };
   const runningOrders = orders.filter(o => normalizeStatus(o.status) === 'running');
   const completedOrders = orders.filter(o => normalizeStatus(o.status) === 'completed');
-  const totalEarned = orders.reduce((sum, o) => sum + Number(o.earned_amount), 0);
+  const settledEarned = orders.reduce((sum, o) => sum + Number(o.earned_amount), 0);
+  const totalEarned = displayEarnings ?? settledEarned;
 
   return (
     <div className="min-h-screen bg-background pb-24 relative">
